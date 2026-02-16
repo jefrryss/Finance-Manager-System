@@ -1,0 +1,8 @@
+env: "local"
+
+postgress:
+   host: "localhost"
+   port: "5432"
+   user: "postgress"
+   db_name: "finance_db"
+   db_type: "postgres"
