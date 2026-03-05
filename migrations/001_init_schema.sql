@@ -82,3 +82,4 @@ CREATE TABLE IF NOT EXISTS Transactions (
         PRIMARY KEY (user_id, transaction_id)
 );
 
+/*Добавить индексы hash , b-tree and fillcover для таблицы*/
