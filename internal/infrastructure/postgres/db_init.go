@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"Finance-Manager-System/internal/configs"
+	"Finance-Manager-System/configs"
 	"fmt"
 	"log"
 
@@ -10,7 +10,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func New(cfg *configs.Config) (*sqlx.DB, error) {
+func NewDB(cfg *configs.Config) (*sqlx.DB, error) {
 	var typeDB string = cfg.TypeDB
 	var driverName string
 	var url string
