@@ -1,0 +1,54 @@
+services:
+  finance_manager_server:
+    build: .
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    env_file:
+     - .env
+    environment:
+      - CONFIG_PATH=./configs/config.yaml
+      - POSTGRESS_HOST=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migarations:
+        condition: service_completed_successfully
+
+
+  migarations:
+    image: migrate/migrate
+    volumes: 
+      - ./migrations:/migrations
+    env_file:
+      .env
+    command:
+      - -path=/migrations/
+      - -database=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRESS_DB}?sslmode=disable
+      - up
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:${POSTGRESS_PORT}"
+    env_file:
+      - .env
+    environment: 
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRESS_DB}
+    healthcheck: 
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+        
+volumes:
+  pg_data:
