@@ -4,9 +4,9 @@ import (
 	"Finance-Manager-System/internal/infrastructure/modules/user/domain"
 	"Finance-Manager-System/internal/infrastructure/modules/user/repository"
 	"context"
-	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,11 +20,11 @@ func NewUserCase(db *repository.UserRepository) *UserCase {
 	}
 }
 
-func (u *UserCase) RegistrateUser(ctx context.Context, email string, login string, password string) error {
+func (u *UserCase) RegistrateUser(ctx context.Context, email string, login string, password string) (uuid.UUID, error) {
 
 	bytesPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -32,31 +32,27 @@ func (u *UserCase) RegistrateUser(ctx context.Context, email string, login strin
 
 	exists_user, err := u.db.CheckExistUser(ctx, login, email)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	if exists_user {
-		return fmt.Errorf("User already exists with login: %s and email: %s", login, email)
+		return uuid.Nil, domain.ErrUserAlreadyExists
 	}
 
 	user, err := domain.NewUser(email, login, string(bytesPassword))
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	err = u.db.CreateUser(ctx, user)
-	return err
+	id, err := u.db.CreateUser(ctx, user)
+	return id, err
 }
 
-func (u *UserCase) ChangeUserPassword(ctx context.Context, user *domain.User, password string) error {
+func (u *UserCase) ChangeUserPassword(ctx context.Context, id uuid.UUID, password string) error {
 	bytesPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	user.HashPassword = string(bytesPassword)
-
-	//Добавлять или нет проверку на то что пользователь сущ?
-
-	err = u.db.UpdateUserInfo(ctx, user)
+	err = u.db.UpdateUserInfo(ctx, id, string(bytesPassword))
 	return err
 }
