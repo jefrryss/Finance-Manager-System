@@ -8,12 +8,18 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	ErrUserAlreadyExists = errors.New("user already exixst")
+	ErrInvalidEmail      = errors.New("invalid email")
+	ErrInvalidPassword   = errors.New("invalid password")
+	ErrInvalidLogin      = errors.New("invalid login")
+)
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 type User struct {
 	User_id      uuid.UUID `db:"user_id"`
 	Email        string    `db:"email"`
-	Login        string    `db:"user_login"`
+	Login        string    `db:"login"`
 	HashPassword string    `db:"hash_password"`
 	Created_at   time.Time `db:"created_at"`
 	Updated_at   time.Time `db:"updated_at"`
@@ -22,13 +28,13 @@ type User struct {
 func NewUser(email string, login string, hashPassword string) (*User, error) {
 
 	if !emailRegex.MatchString(email) {
-		return nil, errors.New("email adress uncorrect")
+		return nil, ErrInvalidEmail
 	}
 	if login == "" {
-		return nil, errors.New("login uncorrect")
+		return nil, ErrInvalidLogin
 	}
 	if hashPassword == "" {
-		return nil, errors.New("hashPassword uncorrect")
+		return nil, ErrInvalidPassword
 	}
 	return &User{
 		User_id:      uuid.New(),

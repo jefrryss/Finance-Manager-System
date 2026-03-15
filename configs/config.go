@@ -8,11 +8,15 @@ import (
 )
 
 type Config struct {
-	Env      string `yaml:"env" env-default:"local"`
-	Postgres PostgressConfig
-	TypeDB   string `yaml:"db_type" env:"TYPE_DB" env-default:"postgres"`
+	HttpServer HttpServer      `yaml:"http_server"`
+	Env        string          `yaml:"env" env-default:"local"`
+	Postgres   PostgressConfig `yaml:"postgres"`
+	TypeDB     string          `yaml:"db_type" env:"TYPE_DB" env-default:"postgres"`
 }
-
+type HttpServer struct {
+	Port   string `yaml:"port" env-default:"8080"`
+	Adress string `yaml:"adress" env-default:"localhost"`
+}
 type PostgressConfig struct {
 	Host   string `yaml:"host" env:"POSTGRESS_HOST" env-default:"postgres"`
 	Port   string `yaml:"port" env:"POSTGRESS_PORT" env-default:"5432"`

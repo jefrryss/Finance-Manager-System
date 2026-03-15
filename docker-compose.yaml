@@ -12,16 +12,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migarations:
+      migrations:
         condition: service_completed_successfully
 
 
-  migarations:
+  migrations:
     image: migrate/migrate
     volumes: 
       - ./migrations:/migrations
     env_file:
-      .env
+      - .env
     command:
       - -path=/migrations/
       - -database=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRESS_DB}?sslmode=disable
