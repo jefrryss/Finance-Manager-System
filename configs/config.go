@@ -14,7 +14,7 @@ type Config struct {
 }
 
 type PostgressConfig struct {
-	Host   string `yaml:"host" env:"POSTGRESS_HOST" env-default:"localhost"`
+	Host   string `yaml:"host" env:"POSTGRESS_HOST" env-default:"postgres"`
 	Port   string `yaml:"port" env:"POSTGRESS_PORT" env-default:"5432"`
 	User   string `yaml:"user" env:"POSTGRES_USER" env-default:"postgress"`
 	DBName string `yaml:"db_name" env:"POSTGRESS_DB" env-default:"finance_db"`
