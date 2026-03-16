@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS Users (
     hash_password TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
+) WITH (fillfactor = 85)
 
 
 CREATE TABLE IF NOT EXISTS Accounts (
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS Accounts (
 
     CONSTRAINT pk_account 
         PRIMARY KEY (user_id, account_id)
-);
+) WITH (fillfactor = 85);
 
 
 CREATE TABLE IF NOT EXISTS Category (
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS Category (
         ON DELETE CASCADE,
 
     UNIQUE(name_category, is_income, user_id)
-);
+) WITH (fillfactor = 85);
 
 
 CREATE TABLE IF NOT EXISTS Transactions (
@@ -77,4 +77,4 @@ CREATE TABLE IF NOT EXISTS Transactions (
 
     CONSTRAINT pk_transactions 
         PRIMARY KEY (user_id, transaction_id)
-);
+) With (fillfactor = 85);
