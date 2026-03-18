@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS Users (
     user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -6,14 +5,20 @@ CREATE TABLE IF NOT EXISTS Users (
     hash_password TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-) WITH (fillfactor = 85)
+) WITH (fillfactor = 85);
 
 
 CREATE TABLE IF NOT EXISTS Accounts (
+    account_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
-    account_id INTEGER NOT NULL,
     balance BIGINT NOT NULL DEFAULT 0,
     is_imported BOOLEAN NOT NULL,
+    
+    external_account_id VARCHAR(255), 
+    account_type VARCHAR(50),         
+    color_hex VARCHAR(7),            
+    is_archived BOOLEAN NOT NULL DEFAULT FALSE, 
+    
     name_account VARCHAR(50) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'RUB',
     last_synced_at TIMESTAMPTZ,
@@ -22,10 +27,7 @@ CREATE TABLE IF NOT EXISTS Accounts (
     CONSTRAINT fk_user_account
         FOREIGN KEY (user_id)
         REFERENCES Users(user_id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT pk_account 
-        PRIMARY KEY (user_id, account_id)
+        ON DELETE CASCADE
 ) WITH (fillfactor = 85);
 
 
@@ -46,11 +48,13 @@ CREATE TABLE IF NOT EXISTS Category (
 ) WITH (fillfactor = 85);
 
 
+
 CREATE TABLE IF NOT EXISTS Transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
-    transaction_id INTEGER NOT NULL,
-    account_id INTEGER NOT NULL,
+    account_id UUID NOT NULL, 
     category_id UUID,
+    
     name_transaction TEXT NOT NULL,
     is_income BOOLEAN NOT NULL,
     amount BIGINT CHECK (amount > 0) NOT NULL,
@@ -69,12 +73,8 @@ CREATE TABLE IF NOT EXISTS Transactions (
         REFERENCES Category(category_id)
         ON DELETE SET NULL,
 
-   
     CONSTRAINT fk_account_transaction
-        FOREIGN KEY (user_id, account_id)
-        REFERENCES Accounts(user_id, account_id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT pk_transactions 
-        PRIMARY KEY (user_id, transaction_id)
-) With (fillfactor = 85);
+        FOREIGN KEY (account_id)
+        REFERENCES Accounts(account_id)
+        ON DELETE CASCADE
+) WITH (fillfactor = 85);
