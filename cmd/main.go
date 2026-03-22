@@ -1,39 +1,120 @@
 package main
 
 import (
-	"Finance-Manager-System/configs"
-	"Finance-Manager-System/internal/infrastructure/modules/user/handler"
-	"Finance-Manager-System/internal/infrastructure/modules/user/repository"
-	"Finance-Manager-System/internal/infrastructure/modules/user/usecase"
-	"Finance-Manager-System/internal/infrastructure/postgres"
 	"log"
 	"net"
 	"net/http"
 
+	"Finance-Manager-System/configs"
+	"Finance-Manager-System/internal/infrastructure/database"
+	"Finance-Manager-System/internal/infrastructure/postgres"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger"
+
+	// Модуль User
+	userHandler "Finance-Manager-System/internal/infrastructure/modules/user/handler"
+	userRepo "Finance-Manager-System/internal/infrastructure/modules/user/repository"
+	userUC "Finance-Manager-System/internal/infrastructure/modules/user/usecase"
+
+	// Модуль Account
+	accountHandler "Finance-Manager-System/internal/infrastructure/modules/account/handler"
+	accountRepo "Finance-Manager-System/internal/infrastructure/modules/account/repository"
+	accountUC "Finance-Manager-System/internal/infrastructure/modules/account/usecase"
+
+	// Модуль Category
+	categoryHandler "Finance-Manager-System/internal/infrastructure/modules/category/handler"
+	categoryRepo "Finance-Manager-System/internal/infrastructure/modules/category/repository"
+	categoryUC "Finance-Manager-System/internal/infrastructure/modules/category/usecase"
+
+	// Модуль Transaction
+	_ "Finance-Manager-System/docs"
+	transHandler "Finance-Manager-System/internal/infrastructure/modules/transactions/handler"
+	transRepo "Finance-Manager-System/internal/infrastructure/modules/transactions/repository"
+	transUC "Finance-Manager-System/internal/infrastructure/modules/transactions/usecase"
+
+	// Модуль Analytics
+	analyticsHandler "Finance-Manager-System/internal/infrastructure/modules/analytics/handler"
+	analyticsRepo "Finance-Manager-System/internal/infrastructure/modules/analytics/repository"
+	analyticsUC "Finance-Manager-System/internal/infrastructure/modules/analytics/usecase"
 )
 
+// @title Finance Manager API
+// @version 1.0
+// @description API для приложения по управлению личными финансами.
+// @host localhost:8080
+// @BasePath /
 func main() {
+	// конфигурации
 	cnf := configs.LoadConfig()
 
+	// БД
 	db, err := postgres.NewDB(cnf)
 	if err != nil {
-		log.Fatal("Problems with db")
+		log.Fatalf("Problems with db: %v", err)
 	}
 
-	userRepo := repository.NewUserRepository(db)
-	useCase := usecase.NewUserCase(userRepo)
-	userRouter := handler.NewUserRouter(useCase)
+	// менеджер транзакций
+	txManager := database.NewTxManager(db)
 
+	// слой Repository
+	userRepository := userRepo.NewUserRepository(db)
+	accRepository := accountRepo.NewAccountRepo(db)
+	catRepository := categoryRepo.NewCategoryRepo(db)
+	transactionRepository := transRepo.NewTransRepository(db)
+	analyticsRepository := analyticsRepo.NewAnalyticsRepository(db)
+
+	// слой UseCase
+	userUseCase := userUC.NewUserCase(userRepository)
+	accountUseCase := accountUC.NewAccountUseCase(accRepository)
+	transactionUseCase := transUC.NewTransactionUseCase(transactionRepository, accRepository, txManager)
+	categoryUseCase := categoryUC.NewCategoryUseCase(catRepository, transactionRepository, txManager)
+	analyticsUseCase := analyticsUC.NewAnalyticsUseCase(analyticsRepository)
+
+	// слой Handler
+	userRouter := userHandler.NewUserRouter(userUseCase)
+	accountRouter := accountHandler.NewAccountRouter(accountUseCase)
+	categoryRouter := categoryHandler.NewCategoryRouter(categoryUseCase)
+	transactionRouter := transHandler.NewTransactionRouter(transactionUseCase)
+	analyticsRouter := analyticsHandler.NewAnalyticsRouter(analyticsUseCase)
+
+	// роутер Chi
 	r := chi.NewRouter()
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-User-ID"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
-	r.Mount("/api/v1/users", userRouter.Route())
+	// middleware
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 
+	// Swagger
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
+	// Сборка маршрутов
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Mount("/users", userRouter.Route())
+		r.Mount("/accounts", accountRouter.Route())
+		r.Mount("/categories", categoryRouter.Route())
+		r.Mount("/transactions", transactionRouter.Route())
+		r.Mount("/analytics", analyticsRouter.Route())
+	})
+
+	// Запуск сервера
 	serverAddr := net.JoinHostPort(cnf.HttpServer.Adress, cnf.HttpServer.Port)
-	log.Printf("server started on: %s\n", serverAddr)
+	log.Printf("Server started on: %s\n", serverAddr)
+	log.Printf("Swagger UI is available at: http://%s/swagger/index.htmln", serverAddr)
 
 	err = http.ListenAndServe(serverAddr, r)
 	if err != nil {
-		log.Fatalf("server didnt start: %v", err)
+		log.Fatalf("Server didn't start: %v", err)
 	}
 }
