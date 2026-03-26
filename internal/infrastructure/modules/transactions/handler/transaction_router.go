@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/transactions/domain"
 	"Finance-Manager-System/internal/infrastructure/modules/transactions/usecase"
 )
@@ -61,16 +62,16 @@ type ToggleVisibilityReq struct {
 
 // @Summary Создать транзакцию
 // @Tags transactions
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param request body CreateTransReq true "Данные транзакции"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/transactions [post]
 func (t *TransactionRouter) CreateTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -97,8 +98,8 @@ func (t *TransactionRouter) CreateTransaction(w http.ResponseWriter, r *http.Req
 
 // @Summary Получить транзакции (с фильтрами)
 // @Tags transactions
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param account_id query string false "ID счета"
 // @Param category_id query string false "ID категории"
 // @Param is_income query boolean false "Тип (доход/расход)"
@@ -108,9 +109,9 @@ func (t *TransactionRouter) CreateTransaction(w http.ResponseWriter, r *http.Req
 // @Success 200 {array} domain.Transaction
 // @Router /api/v1/transactions [get]
 func (t *TransactionRouter) GetTransactions(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -157,17 +158,17 @@ func (t *TransactionRouter) GetTransactions(w http.ResponseWriter, r *http.Reque
 
 // @Summary Обновить транзакцию
 // @Tags transactions
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param id path string true "ID транзакции"
 // @Param request body UpdateTransReq true "Данные для обновления"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/transactions/{id} [put]
 func (t *TransactionRouter) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -200,15 +201,15 @@ func (t *TransactionRouter) UpdateTransaction(w http.ResponseWriter, r *http.Req
 
 // @Summary Удалить транзакцию
 // @Tags transactions
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param id path string true "ID транзакции"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/transactions/{id} [delete]
 func (t *TransactionRouter) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -231,16 +232,16 @@ func (t *TransactionRouter) DeleteTransaction(w http.ResponseWriter, r *http.Req
 
 // @Summary Изменить видимость транзакций
 // @Tags transactions
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param request body ToggleVisibilityReq true "IDs транзакций и статус"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/transactions/visibility [patch]
 func (t *TransactionRouter) ToggleVisibility(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 

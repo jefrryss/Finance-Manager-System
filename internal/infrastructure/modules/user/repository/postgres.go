@@ -17,6 +17,17 @@ func NewUserRepository(db *sqlx.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
+func (u *UserRepository) GetUserByEmailOrLogin(ctx context.Context, identifier string) (*domain.User, error) {
+	query := `SELECT * FROM Users WHERE email = $1 OR login = $1 LIMIT 1`
+	var user domain.User
+
+	err := u.db.GetContext(ctx, &user, query, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (u *UserRepository) CreateUser(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `INSERT INTO Users(user_id, email, login, hash_password, created_at, updated_at)
 		VALUES(:user_id, :email, :login, :hash_password, :created_at, :updated_at)

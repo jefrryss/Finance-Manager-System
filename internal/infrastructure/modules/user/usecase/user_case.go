@@ -5,7 +5,9 @@ import (
 	"Finance-Manager-System/internal/infrastructure/modules/user/repository"
 	"context"
 	"strings"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,6 +20,34 @@ func NewUserCase(db *repository.UserRepository) *UserCase {
 	return &UserCase{
 		db: db,
 	}
+}
+
+var jwtSecretKey = []byte("super-secret-key-change-me")
+
+func (u *UserCase) LoginUser(ctx context.Context, identifier, password string) (string, error) {
+	identifier = strings.ToLower(strings.TrimSpace(identifier))
+
+	user, err := u.db.GetUserByEmailOrLogin(ctx, identifier)
+	if err != nil {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.HashPassword), []byte(password))
+	if err != nil {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": user.User_id.String(),
+		"exp":     time.Now().Add(time.Hour * 72).Unix(),
+	})
+
+	tokenString, err := token.SignedString(jwtSecretKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }
 
 func (u *UserCase) RegistrateUser(ctx context.Context, email string, login string, password string) (uuid.UUID, error) {

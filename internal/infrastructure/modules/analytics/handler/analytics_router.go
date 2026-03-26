@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 
+	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/analytics/usecase"
 )
 
@@ -46,14 +46,14 @@ func parseDates(r *http.Request) (*time.Time, *time.Time) {
 
 // @Summary Получить сводку (доходы и расходы)
 // @Tags analytics
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param start_date query string false "Начальная дата (RFC3339)"
 // @Param end_date query string false "Конечная дата (RFC3339)"
 // @Success 200 {object} domain.SummaryReport
 // @Router /api/v1/analytics/summary [get]
 func (a *AnalyticsRouter) GetSummary(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -72,14 +72,14 @@ func (a *AnalyticsRouter) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 // @Summary Получить траты по категориям
 // @Tags analytics
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param start_date query string false "Начальная дата (RFC3339)"
 // @Param end_date query string false "Конечная дата (RFC3339)"
 // @Success 200 {array} domain.CategoryReport
 // @Router /api/v1/analytics/categories [get]
 func (a *AnalyticsRouter) GetCategories(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -98,15 +98,15 @@ func (a *AnalyticsRouter) GetCategories(w http.ResponseWriter, r *http.Request) 
 
 // @Summary Получить динамику по дням
 // @Tags analytics
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param is_income query boolean false "Доходы (true) или расходы (false)"
 // @Param start_date query string false "Начальная дата (RFC3339)"
 // @Param end_date query string false "Конечная дата (RFC3339)"
 // @Success 200 {array} domain.DailyReport
 // @Router /api/v1/analytics/daily [get]
 func (a *AnalyticsRouter) GetDaily(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
