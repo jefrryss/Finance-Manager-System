@@ -7,10 +7,11 @@ import (
 
 	"Finance-Manager-System/configs"
 	"Finance-Manager-System/internal/infrastructure/database"
+	authMiddleware "Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/postgres"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger"
 
@@ -91,10 +92,10 @@ func main() {
 	}))
 
 	// middleware
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chiMiddleware.RequestID)
+	r.Use(chiMiddleware.RealIP)
+	r.Use(chiMiddleware.Logger)
+	r.Use(chiMiddleware.Recoverer)
 
 	// Swagger
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
@@ -102,10 +103,15 @@ func main() {
 	// Сборка маршрутов
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/users", userRouter.Route())
-		r.Mount("/accounts", accountRouter.Route())
-		r.Mount("/categories", categoryRouter.Route())
-		r.Mount("/transactions", transactionRouter.Route())
-		r.Mount("/analytics", analyticsRouter.Route())
+
+		// Protected API: require JWT auth for all finance data routes.
+		r.Group(func(r chi.Router) {
+			r.Use(authMiddleware.RequireAuth)
+			r.Mount("/accounts", accountRouter.Route())
+			r.Mount("/categories", categoryRouter.Route())
+			r.Mount("/transactions", transactionRouter.Route())
+			r.Mount("/analytics", analyticsRouter.Route())
+		})
 	})
 
 	// Запуск сервера
