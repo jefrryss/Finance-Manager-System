@@ -104,7 +104,6 @@ func main() {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/users", userRouter.Route())
 
-		// Protected API: require JWT auth for all finance data routes.
 		r.Group(func(r chi.Router) {
 			r.Use(authMiddleware.RequireAuth)
 			r.Mount("/accounts", accountRouter.Route())
