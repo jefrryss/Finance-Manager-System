@@ -50,6 +50,7 @@ import (
 func main() {
 	// конфигурации
 	cnf := configs.LoadConfig()
+	authMiddleware.SetJWTSecret(cnf.JWTSecret)
 
 	// БД
 	db, err := postgres.NewDB(cnf)
@@ -68,7 +69,7 @@ func main() {
 	analyticsRepository := analyticsRepo.NewAnalyticsRepository(db)
 
 	// слой UseCase
-	userUseCase := userUC.NewUserCase(userRepository)
+	userUseCase := userUC.NewUserCase(userRepository, cnf.JWTSecret)
 	accountUseCase := accountUC.NewAccountUseCase(accRepository)
 	transactionUseCase := transUC.NewTransactionUseCase(transactionRepository, accRepository, txManager)
 	categoryUseCase := categoryUC.NewCategoryUseCase(catRepository, transactionRepository, txManager)

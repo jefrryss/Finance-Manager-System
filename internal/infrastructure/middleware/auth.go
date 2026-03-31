@@ -14,10 +14,19 @@ type contextKey string
 
 const UserIDKey contextKey = "user_id"
 
-var jwtSecretKey = []byte("super-secret-key-change-me")
+var jwtSecretKey []byte
+
+func SetJWTSecret(secret string) {
+	jwtSecretKey = []byte(secret)
+}
 
 func RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(jwtSecretKey) == 0 {
+			http.Error(w, "JWT secret is not configured", http.StatusInternalServerError)
+			return
+		}
+
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
