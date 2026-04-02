@@ -15,12 +15,18 @@ import (
 type UserCase struct {
 	db           *repository.UserRepository
 	jwtSecretKey []byte
+	catBootstrap DefaultCategoryBootstrapper
 }
 
-func NewUserCase(db *repository.UserRepository, jwtSecret string) *UserCase {
+type DefaultCategoryBootstrapper interface {
+	EnsureDefaultCategories(ctx context.Context, userID uuid.UUID) error
+}
+
+func NewUserCase(db *repository.UserRepository, jwtSecret string, catBootstrap DefaultCategoryBootstrapper) *UserCase {
 	return &UserCase{
 		db:           db,
 		jwtSecretKey: []byte(jwtSecret),
+		catBootstrap: catBootstrap,
 	}
 }
 
@@ -35,6 +41,10 @@ func (u *UserCase) LoginUser(ctx context.Context, identifier, password string) (
 	err = bcrypt.CompareHashAndPassword([]byte(user.HashPassword), []byte(password))
 	if err != nil {
 		return "", domain.ErrInvalidCredentials
+	}
+
+	if err := u.catBootstrap.EnsureDefaultCategories(ctx, user.User_id); err != nil {
+		return "", err
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -74,7 +84,15 @@ func (u *UserCase) RegistrateUser(ctx context.Context, email string, login strin
 	}
 
 	id, err := u.db.CreateUser(ctx, user)
-	return id, err
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if err := u.catBootstrap.EnsureDefaultCategories(ctx, id); err != nil {
+		return uuid.Nil, err
+	}
+
+	return id, nil
 }
 
 func (u *UserCase) ChangeUserPassword(ctx context.Context, id uuid.UUID, password string) error {

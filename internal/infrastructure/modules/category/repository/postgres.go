@@ -15,8 +15,48 @@ type CategoryRepo struct {
 	db *sqlx.DB
 }
 
+type defaultCategory struct {
+	Name     string
+	IsIncome bool
+}
+
+var defaultCategories = []defaultCategory{
+	{Name: "Продукты", IsIncome: false},
+	{Name: "Кафе и рестораны", IsIncome: false},
+	{Name: "Транспорт", IsIncome: false},
+	{Name: "Жилье", IsIncome: false},
+	{Name: "Здоровье", IsIncome: false},
+	{Name: "Развлечения", IsIncome: false},
+	{Name: "Покупки", IsIncome: false},
+	{Name: "Подписки", IsIncome: false},
+	{Name: "Переводы", IsIncome: false},
+	{Name: "Другое", IsIncome: false},
+	{Name: "Зарплата", IsIncome: true},
+	{Name: "Кэшбэк", IsIncome: true},
+	{Name: "Проценты", IsIncome: true},
+	{Name: "Подарки", IsIncome: true},
+	{Name: "Другое", IsIncome: true},
+}
+
 func NewCategoryRepo(db *sqlx.DB) *CategoryRepo {
 	return &CategoryRepo{db: db}
+}
+
+func (r *CategoryRepo) EnsureDefaultCategories(ctx context.Context, userID uuid.UUID) error {
+	q := database.GetQueryer(ctx, r.db)
+	query := `
+		INSERT INTO Category (user_id, name_category, is_income, is_custom, icon_url)
+		VALUES ($1, $2, $3, false, NULL)
+		ON CONFLICT (name_category, is_income, user_id) DO NOTHING
+	`
+
+	for _, cat := range defaultCategories {
+		if _, err := q.ExecContext(ctx, query, userID, cat.Name, cat.IsIncome); err != nil {
+			return fmt.Errorf("failed to ensure default categories: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (r *CategoryRepo) AddCategory(ctx context.Context, category *domain.Category) (uuid.UUID, error) {
