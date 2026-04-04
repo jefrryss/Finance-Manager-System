@@ -18,24 +18,25 @@ type CategoryRepo struct {
 type defaultCategory struct {
 	Name     string
 	IsIncome bool
+	IconURL  string
 }
 
 var defaultCategories = []defaultCategory{
-	{Name: "Продукты", IsIncome: false},
-	{Name: "Кафе и рестораны", IsIncome: false},
-	{Name: "Транспорт", IsIncome: false},
-	{Name: "Жилье", IsIncome: false},
-	{Name: "Здоровье", IsIncome: false},
-	{Name: "Развлечения", IsIncome: false},
-	{Name: "Покупки", IsIncome: false},
-	{Name: "Подписки", IsIncome: false},
-	{Name: "Переводы", IsIncome: false},
-	{Name: "Другое", IsIncome: false},
-	{Name: "Зарплата", IsIncome: true},
-	{Name: "Кэшбэк", IsIncome: true},
-	{Name: "Проценты", IsIncome: true},
-	{Name: "Подарки", IsIncome: true},
-	{Name: "Другое", IsIncome: true},
+	{Name: "Продукты", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f96b.svg"},
+	{Name: "Кафе и рестораны", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f37d.svg"},
+	{Name: "Транспорт", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f695.svg"},
+	{Name: "Жилье", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f3e0.svg"},
+	{Name: "Здоровье", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1fa7a.svg"},
+	{Name: "Развлечения", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f3ad.svg"},
+	{Name: "Покупки", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f6cd.svg"},
+	{Name: "Подписки", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4f1.svg"},
+	{Name: "Переводы", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4b8.svg"},
+	{Name: "Другое", IsIncome: false, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4c2.svg"},
+	{Name: "Зарплата", IsIncome: true, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4bc.svg"},
+	{Name: "Кэшбэк", IsIncome: true, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4b3.svg"},
+	{Name: "Проценты", IsIncome: true, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4c8.svg"},
+	{Name: "Подарки", IsIncome: true, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f381.svg"},
+	{Name: "Другое", IsIncome: true, IconURL: "https://raw.githubusercontent.com/twitter/twemoji/gh-pages/svg/1f4c2.svg"},
 }
 
 func NewCategoryRepo(db *sqlx.DB) *CategoryRepo {
@@ -46,12 +47,12 @@ func (r *CategoryRepo) EnsureDefaultCategories(ctx context.Context, userID uuid.
 	q := database.GetQueryer(ctx, r.db)
 	query := `
 		INSERT INTO Category (user_id, name_category, is_income, is_custom, icon_url)
-		VALUES ($1, $2, $3, false, NULL)
+		VALUES ($1, $2, $3, false, $4)
 		ON CONFLICT (name_category, is_income, user_id) DO NOTHING
 	`
 
 	for _, cat := range defaultCategories {
-		if _, err := q.ExecContext(ctx, query, userID, cat.Name, cat.IsIncome); err != nil {
+		if _, err := q.ExecContext(ctx, query, userID, cat.Name, cat.IsIncome, cat.IconURL); err != nil {
 			return fmt.Errorf("failed to ensure default categories: %w", err)
 		}
 	}
