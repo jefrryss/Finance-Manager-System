@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -25,6 +26,7 @@ func (a *AccountRouter) Route() chi.Router {
 	r := chi.NewRouter()
 
 	r.Post("/", a.CreateAccount)
+	r.Post("/import/pdf", a.ImportAccountFromPDF)
 	r.Get("/", a.GetAccounts)
 	r.Put("/{id}", a.RenameAccount)
 	r.Delete("/{id}", a.ArchiveAccount)
@@ -87,6 +89,50 @@ func (a *AccountRouter) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
 		"message": "Account created",
+	})
+}
+
+func (a *AccountRouter) ImportAccountFromPDF(w http.ResponseWriter, r *http.Request) {
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if err := r.ParseMultipartForm(25 << 20); err != nil {
+		http.Error(w, "Invalid multipart form", http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "file is required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "failed to read file", http.StatusBadRequest)
+		return
+	}
+
+	accountName := r.FormValue("name")
+	result, err := a.accountUC.ImportAccountFromTBankPDF(r.Context(), userID, accountName, data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":                "success",
+		"account_id":            result.AccountID,
+		"imported_transactions": result.ImportedTransactions,
+		"balance":               result.Balance,
+		"account_number":        result.AccountNumber,
+		"contract_number":       result.ContractNumber,
 	})
 }
 
