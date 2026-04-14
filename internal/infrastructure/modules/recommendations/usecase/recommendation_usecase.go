@@ -56,7 +56,6 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 		CategoryName     string
 		IconURL          *string
 		ShareSum         float64
-		ShareCount       int
 		LastMonthExpense int64
 	}
 
@@ -99,17 +98,24 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 		for catKey, amount := range categoryByMonth[monthKey] {
 			meta := categoryMeta[catKey]
 			meta.ShareSum += float64(amount) / float64(total)
-			meta.ShareCount++
 			categoryMeta[catKey] = meta
 		}
 	}
 
+	totalRawShare := 0.0
+	for _, stat := range categoryMeta {
+		totalRawShare += stat.ShareSum / float64(months)
+	}
+
 	recommendations := make([]domain.BudgetRecommendation, 0, len(categoryMeta))
 	for _, stat := range categoryMeta {
-		if stat.ShareCount == 0 {
+		averageShare := stat.ShareSum / float64(months)
+		if averageShare <= 0 {
 			continue
 		}
-		averageShare := stat.ShareSum / float64(stat.ShareCount)
+		if totalRawShare > 0 {
+			averageShare = averageShare / totalRawShare
+		}
 		recommendedLimit := int64(math.Round(float64(plannedTotal) * averageShare))
 		overBudgetAmount := stat.LastMonthExpense - recommendedLimit
 		isOverBudget := overBudgetAmount > 0
@@ -134,6 +140,19 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 	sort.Slice(recommendations, func(i, j int) bool {
 		return recommendations[i].RecommendedLimit > recommendations[j].RecommendedLimit
 	})
+
+	if len(recommendations) > 0 {
+		recommendedSum := int64(0)
+		for i := range recommendations {
+			recommendedSum += recommendations[i].RecommendedLimit
+		}
+		diff := plannedTotal - recommendedSum
+		recommendations[0].RecommendedLimit += diff
+
+		if recommendations[0].RecommendedLimit < 0 {
+			recommendations[0].RecommendedLimit = 0
+		}
+	}
 
 	return recommendations, nil
 }
