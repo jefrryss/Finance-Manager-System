@@ -92,6 +92,15 @@ func (a *AccountRouter) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// @Summary Импортировать счет и транзакции из PDF выписки Т-Банка
+// @Tags accounts
+// @Security ApiKeyAuth
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "PDF выписка Т-Банка"
+// @Param name formData string false "Название счета"
+// @Success 202 {object} map[string]interface{}
+// @Router /api/v1/accounts/import/pdf [post]
 func (a *AccountRouter) ImportAccountFromPDF(w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {

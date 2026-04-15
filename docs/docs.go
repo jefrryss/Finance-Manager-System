@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/api/v1/accounts": {
             "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -24,15 +29,6 @@ const docTemplate = `{
                     "accounts"
                 ],
                 "summary": "Получить все активные счета",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -46,6 +42,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -57,13 +58,6 @@ const docTemplate = `{
                 ],
                 "summary": "Создать счет",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Данные счета",
                         "name": "request",
@@ -85,8 +79,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/accounts/import/pdf": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accounts"
+                ],
+                "summary": "Импортировать счет и транзакции из PDF выписки Т-Банка",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "PDF выписка Т-Банка",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Название счета",
+                        "name": "name",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/accounts/{id}": {
             "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -98,13 +140,6 @@ const docTemplate = `{
                 ],
                 "summary": "Переименовать счет",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "ID счета",
@@ -133,6 +168,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -141,13 +181,6 @@ const docTemplate = `{
                 ],
                 "summary": "Архивировать (удалить) счет",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "ID счета",
@@ -167,8 +200,139 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/analytics/categories": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Получить траты по категориям",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Начальная дата (RFC3339)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Конечная дата (RFC3339)",
+                        "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.CategoryReport"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/analytics/daily": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Получить динамику по дням",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Доходы (true) или расходы (false)",
+                        "name": "is_income",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Начальная дата (RFC3339)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Конечная дата (RFC3339)",
+                        "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.DailyReport"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/analytics/summary": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Получить сводку (доходы и расходы)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Начальная дата (RFC3339)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Конечная дата (RFC3339)",
+                        "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.SummaryReport"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/categories": {
             "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -176,15 +340,6 @@ const docTemplate = `{
                     "categories"
                 ],
                 "summary": "Получить категории",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -198,6 +353,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -209,13 +369,6 @@ const docTemplate = `{
                 ],
                 "summary": "Создать категорию",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Данные категории",
                         "name": "request",
@@ -239,6 +392,11 @@ const docTemplate = `{
         },
         "/api/v1/categories/{id}": {
             "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -250,13 +408,6 @@ const docTemplate = `{
                 ],
                 "summary": "Обновить категорию",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "ID категории",
@@ -285,6 +436,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -296,13 +452,6 @@ const docTemplate = `{
                 ],
                 "summary": "Удалить категорию",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "ID категории",
@@ -330,22 +479,275 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/goals": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Получить список целей (сводка)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.GoalSummary"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Создать новую цель",
+                "parameters": [
+                    {
+                        "description": "Данные цели",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateGoalReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/goals/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Получить детали цели (история и прогноз)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID цели",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.GoalDetails"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Обновить параметры цели",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID цели",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Новые данные цели",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateGoalReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Удалить цель",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID цели",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/goals/{id}/contributions": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "goals"
+                ],
+                "summary": "Добавить пополнение цели",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID цели",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные пополнения",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AddContributionReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/transactions": {
             "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "transactions"
                 ],
-                "summary": "Получить транзакции",
+                "summary": "Получить транзакции (с фильтрами)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
+                        "description": "ID счета",
+                        "name": "account_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID категории",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Тип (доход/расход)",
+                        "name": "is_income",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Начальная дата (RFC3339)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Конечная дата (RFC3339)",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Показать скрытые",
+                        "name": "is_hidden",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -361,6 +763,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -372,13 +779,6 @@ const docTemplate = `{
                 ],
                 "summary": "Создать транзакцию",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "Данные транзакции",
                         "name": "request",
@@ -402,6 +802,11 @@ const docTemplate = `{
         },
         "/api/v1/transactions/visibility": {
             "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -413,13 +818,6 @@ const docTemplate = `{
                 ],
                 "summary": "Изменить видимость транзакций",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "description": "IDs транзакций и статус",
                         "name": "request",
@@ -442,7 +840,56 @@ const docTemplate = `{
             }
         },
         "/api/v1/transactions/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Обновить транзакцию",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID транзакции",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные для обновления",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateTransReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
             "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -451,13 +898,6 @@ const docTemplate = `{
                 ],
                 "summary": "Удалить транзакцию",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID пользователя",
-                        "name": "X-User-ID",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "ID транзакции",
@@ -479,6 +919,11 @@ const docTemplate = `{
         },
         "/api/v1/users/change_password": {
             "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -503,6 +948,40 @@ const docTemplate = `{
                 "responses": {
                     "202": {
                         "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Авторизация (вход)",
+                "parameters": [
+                    {
+                        "description": "Данные для входа",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.LoginReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -611,6 +1090,135 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.CategoryReport": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "integer"
+                }
+            }
+        },
+        "domain.DailyReport": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "integer"
+                }
+            }
+        },
+        "domain.GoalContribution": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "contribution_date": {
+                    "type": "string"
+                },
+                "contribution_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.GoalDetails": {
+            "type": "object",
+            "properties": {
+                "contributions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GoalContribution"
+                    }
+                },
+                "forecast": {
+                    "$ref": "#/definitions/domain.GoalForecast"
+                },
+                "summary": {
+                    "$ref": "#/definitions/domain.GoalSummary"
+                }
+            }
+        },
+        "domain.GoalForecast": {
+            "type": "object",
+            "properties": {
+                "average_monthly_contribution": {
+                    "type": "integer"
+                },
+                "estimated_reach_date": {
+                    "type": "string"
+                },
+                "remaining_months": {
+                    "type": "integer"
+                }
+            }
+        },
+        "domain.GoalStatus": {
+            "type": "string",
+            "enum": [
+                "in_progress",
+                "achieved",
+                "overdue"
+            ],
+            "x-enum-varnames": [
+                "GoalStatusInProgress",
+                "GoalStatusAchieved",
+                "GoalStatusOverdue"
+            ]
+        },
+        "domain.GoalSummary": {
+            "type": "object",
+            "properties": {
+                "current_amount": {
+                    "type": "integer"
+                },
+                "goal_id": {
+                    "type": "string"
+                },
+                "name_goal": {
+                    "type": "string"
+                },
+                "progress_percent": {
+                    "type": "number"
+                },
+                "status": {
+                    "$ref": "#/definitions/domain.GoalStatus"
+                },
+                "target_amount": {
+                    "type": "integer"
+                },
+                "target_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.SummaryReport": {
+            "type": "object",
+            "properties": {
+                "total_expense": {
+                    "type": "integer"
+                },
+                "total_income": {
+                    "type": "integer"
+                }
+            }
+        },
         "domain.Transaction": {
             "type": "object",
             "properties": {
@@ -649,12 +1257,23 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.AddContributionReq": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "contribution_date": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.ChangePasswordReq": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "string"
-                },
                 "password": {
                     "type": "string"
                 }
@@ -703,6 +1322,20 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.CreateGoalReq": {
+            "type": "object",
+            "properties": {
+                "name_goal": {
+                    "type": "string"
+                },
+                "target_amount": {
+                    "type": "integer"
+                },
+                "target_date": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.CreateTransReq": {
             "type": "object",
             "properties": {
@@ -733,6 +1366,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "replacement_category_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.LoginReq": {
+            "type": "object",
+            "properties": {
+                "identifier": {
+                    "type": "string"
+                },
+                "password": {
                     "type": "string"
                 }
             }
@@ -784,6 +1428,50 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "handler.UpdateGoalReq": {
+            "type": "object",
+            "properties": {
+                "name_goal": {
+                    "type": "string"
+                },
+                "target_amount": {
+                    "type": "integer"
+                },
+                "target_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.UpdateTransReq": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "is_income": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
