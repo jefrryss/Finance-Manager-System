@@ -81,6 +81,9 @@ func (r *AccountRepo) ChangeNameAccount(ctx context.Context, name string, userID
 
 func (r *AccountRepo) AddAccount(ctx context.Context, acc *domain.Account) (uuid.UUID, error) {
 	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return uuid.Nil, err
+	}
 	query := `
         INSERT INTO Accounts (
             user_id, balance, is_imported, external_account_id, 
@@ -107,6 +110,24 @@ func (r *AccountRepo) AddAccount(ctx context.Context, acc *domain.Account) (uuid
 	}
 
 	return accountID, nil
+}
+
+func (r *AccountRepo) ensureAccountsSchema(ctx context.Context, q database.Queryer) error {
+	queries := []string{
+		`ALTER TABLE Accounts ADD COLUMN IF NOT EXISTS external_account_id VARCHAR(255)`,
+		`ALTER TABLE Accounts ADD COLUMN IF NOT EXISTS account_type VARCHAR(50)`,
+		`ALTER TABLE Accounts ADD COLUMN IF NOT EXISTS color_hex VARCHAR(7)`,
+		`ALTER TABLE Accounts ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE`,
+		`ALTER TABLE Accounts ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ`,
+		`ALTER TABLE Accounts ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'RUB'`,
+	}
+
+	for _, query := range queries {
+		if _, err := q.ExecContext(ctx, query); err != nil {
+			return fmt.Errorf("failed to ensure accounts schema: %w", err)
+		}
+	}
+	return nil
 }
 
 func (r *AccountRepo) ArchiveAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) error {
