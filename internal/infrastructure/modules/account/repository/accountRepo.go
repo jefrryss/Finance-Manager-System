@@ -84,13 +84,18 @@ func (r *AccountRepo) AddAccount(ctx context.Context, acc *domain.Account) (uuid
 	if err := r.ensureAccountsSchema(ctx, q); err != nil {
 		return uuid.Nil, err
 	}
+	if acc.AccountID == uuid.Nil {
+		acc.AccountID = uuid.New()
+	}
 	query := `
         INSERT INTO Accounts (
+            account_id,
             user_id, balance, is_imported, external_account_id, 
             account_type, color_hex, is_archived, name_account, 
             currency, last_synced_at, created_at
         ) 
         VALUES (
+            :account_id,
             :user_id, :balance, :is_imported, :external_account_id, 
             :account_type, :color_hex, :is_archived, :name_account, 
             :currency, :last_synced_at, :created_at
