@@ -692,6 +692,58 @@
                 }
             }
         },
+        "/api/v1/recommendations/budget": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "recommendations"
+                ],
+                "summary": "Получить рекомендации по бюджету",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Планируемый общий бюджет расходов (в копейках)",
+                        "name": "planned_total",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Сколько последних месяцев анализировать (1..12, по умолчанию 3)",
+                        "name": "months",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Учитывать скрытые транзакции",
+                        "name": "include_hidden",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "CSV список account_id для фильтра",
+                        "name": "account_ids",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/transactions": {
             "get": {
                 "security": [

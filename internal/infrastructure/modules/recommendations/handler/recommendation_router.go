@@ -28,6 +28,16 @@ func (h *RecommendationRouter) Route() chi.Router {
 	return r
 }
 
+// @Summary Получить рекомендации по бюджету
+// @Tags recommendations
+// @Security ApiKeyAuth
+// @Produce json
+// @Param planned_total query integer true "Планируемый общий бюджет расходов (в копейках)"
+// @Param months query integer false "Сколько последних месяцев анализировать (1..12, по умолчанию 3)"
+// @Param include_hidden query boolean false "Учитывать скрытые транзакции"
+// @Param account_ids query string false "CSV список account_id для фильтра"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/recommendations/budget [get]
 func (h *RecommendationRouter) GetBudgetRecommendations(w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
