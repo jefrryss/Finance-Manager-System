@@ -1,7 +1,7 @@
 package configs
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -35,13 +35,13 @@ func LoadConfig() *Config {
 	}
 
 	if _, err := os.Stat(ConfigPath); os.IsNotExist(err) {
-		log.Fatalf("Config didnt find %s", ConfigPath)
+		panic(fmt.Sprintf("config not found: %s", ConfigPath))
 	}
 
 	var cfg Config
 
 	if err := cleanenv.ReadConfig(ConfigPath, &cfg); err != nil {
-		log.Fatalf("Ошибка чтения конфига: %s", err)
+		panic(fmt.Sprintf("config read failed: %v", err))
 	}
 
 	return &cfg

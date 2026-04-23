@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"net"
 	"net/http"
 
 	"Finance-Manager-System/configs"
 	"Finance-Manager-System/internal/infrastructure/database"
+	"Finance-Manager-System/internal/infrastructure/logger"
 	authMiddleware "Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/postgres"
 
@@ -14,6 +14,7 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger"
+	"go.uber.org/zap"
 
 	// Модуль User
 	userHandler "Finance-Manager-System/internal/infrastructure/modules/user/handler"
@@ -61,20 +62,21 @@ import (
 // @in header
 // @name Authorization
 func main() {
-	// конфигурации
 	cnf := configs.LoadConfig()
+	if err := logger.Init(cnf.Env); err != nil {
+		panic(err)
+	}
+	defer logger.Sync()
+
 	authMiddleware.SetJWTSecret(cnf.JWTSecret)
 
-	// БД
 	db, err := postgres.NewDB(cnf)
 	if err != nil {
-		log.Fatalf("Problems with db: %v", err)
+		zap.L().Fatal("db_connection_failed", zap.Error(err))
 	}
 
-	// менеджер транзакций
 	txManager := database.NewTxManager(db)
 
-	// слой Repository
 	userRepository := userRepo.NewUserRepository(db)
 	accRepository := accountRepo.NewAccountRepo(db)
 	catRepository := categoryRepo.NewCategoryRepo(db)
@@ -83,7 +85,6 @@ func main() {
 	recommendationsRepository := recommendationRepo.NewRecommendationRepository(db)
 	goalsRepository := goalRepo.NewGoalRepo(db)
 
-	// слой UseCase
 	userUseCase := userUC.NewUserCase(userRepository, cnf.JWTSecret, catRepository)
 	accountUseCase := accountUC.NewAccountUseCase(accRepository, catRepository, transactionRepository, txManager)
 	transactionUseCase := transUC.NewTransactionUseCase(transactionRepository, accRepository, txManager)
@@ -92,7 +93,6 @@ func main() {
 	recommendationsUseCase := recommendationUC.NewRecommendationUseCase(recommendationsRepository)
 	goalsUseCase := goalUC.NewGoalUseCase(goalsRepository, txManager)
 
-	// слой Handler
 	userRouter := userHandler.NewUserRouter(userUseCase)
 	accountRouter := accountHandler.NewAccountRouter(accountUseCase)
 	categoryRouter := categoryHandler.NewCategoryRouter(categoryUseCase)
@@ -101,7 +101,6 @@ func main() {
 	recommendationRouter := recommendationHandler.NewRecommendationRouter(recommendationsUseCase)
 	goalsRouter := goalHandler.NewGoalRouter(goalsUseCase)
 
-	// роутер Chi
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
@@ -111,16 +110,13 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// middleware
 	r.Use(chiMiddleware.RequestID)
 	r.Use(chiMiddleware.RealIP)
-	r.Use(chiMiddleware.Logger)
-	r.Use(chiMiddleware.Recoverer)
+	r.Use(authMiddleware.ZapRequestLogger)
+	r.Use(authMiddleware.ZapRecoverer)
 
-	// Swagger
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
-	// Сборка маршрутов
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/users", userRouter.Route())
 
@@ -135,13 +131,12 @@ func main() {
 		})
 	})
 
-	// Запуск сервера
 	serverAddr := net.JoinHostPort(cnf.HttpServer.Adress, cnf.HttpServer.Port)
-	log.Printf("Server started on: %s\n", serverAddr)
-	log.Printf("Swagger UI is available at: http://%s/swagger/index.html\n", serverAddr)
+	zap.L().Info("server_started", zap.String("addr", serverAddr))
+	zap.L().Info("swagger_ready", zap.String("url", "http://"+serverAddr+"/swagger/index.html"))
 
 	err = http.ListenAndServe(serverAddr, r)
 	if err != nil {
-		log.Fatalf("Server didn't start: %v", err)
+		zap.L().Fatal("server_start_failed", zap.Error(err))
 	}
 }

@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -11,6 +10,7 @@ import (
 	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/user/domain"
 	"Finance-Manager-System/internal/infrastructure/modules/user/usecase"
+	"go.uber.org/zap"
 )
 
 type UserRouter struct {
@@ -161,7 +161,7 @@ func (u *UserRouter) mapError(w http.ResponseWriter, err error) {
 		statusCode = http.StatusBadRequest
 		message = "Invalid input password"
 	default:
-		log.Printf("DB error: %v", err)
+		zap.L().Error("user_handler_internal_error", zap.Error(err))
 		statusCode = http.StatusInternalServerError
 		message = "Internal server error"
 	}
