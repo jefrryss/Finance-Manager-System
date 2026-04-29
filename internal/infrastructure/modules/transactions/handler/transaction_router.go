@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -44,6 +45,9 @@ type CreateTransReq struct {
 	Amount      int64      `json:"amount"`
 	CompletedAt time.Time  `json:"completed_at"`
 	Comment     *string    `json:"comment"`
+	Currency    string     `json:"currency"`
+	BankFee     int64      `json:"bank_fee"`
+	Status      string     `json:"status"`
 }
 
 type UpdateTransReq struct {
@@ -53,6 +57,9 @@ type UpdateTransReq struct {
 	Amount      int64      `json:"amount"`
 	CompletedAt time.Time  `json:"completed_at"`
 	Comment     *string    `json:"comment"`
+	Currency    string     `json:"currency"`
+	BankFee     int64      `json:"bank_fee"`
+	Status      string     `json:"status"`
 }
 
 type ToggleVisibilityReq struct {
@@ -83,7 +90,7 @@ func (t *TransactionRouter) CreateTransaction(w http.ResponseWriter, r *http.Req
 
 	err = t.transUC.CreateManualTransaction(
 		r.Context(), userID, req.AccountID, req.CategoryID,
-		req.Name, req.IsIncome, req.Amount, req.CompletedAt, req.Comment,
+		req.Name, req.IsIncome, req.Amount, req.CompletedAt, req.Comment, req.Currency, req.BankFee, req.Status,
 	)
 
 	if err != nil {
@@ -134,6 +141,9 @@ func (t *TransactionRouter) GetTransactions(w http.ResponseWriter, r *http.Reque
 	if isHid := r.URL.Query().Get("is_hidden"); isHid != "" {
 		val := isHid == "true"
 		filter.IsHidden = &val
+		filter.HasIsHiddenSet = true
+	} else {
+		filter.IncludeHidden = r.URL.Query().Get("include_hidden") == "true"
 	}
 	if start := r.URL.Query().Get("start_date"); start != "" {
 		if parsed, err := time.Parse(time.RFC3339, start); err == nil {
@@ -143,6 +153,52 @@ func (t *TransactionRouter) GetTransactions(w http.ResponseWriter, r *http.Reque
 	if end := r.URL.Query().Get("end_date"); end != "" {
 		if parsed, err := time.Parse(time.RFC3339, end); err == nil {
 			filter.EndDate = &parsed
+		}
+	}
+	if accountIDsRaw := r.URL.Query().Get("account_ids"); accountIDsRaw != "" {
+		accountIDs := make([]uuid.UUID, 0)
+		for _, token := range strings.Split(accountIDsRaw, ",") {
+			token = strings.TrimSpace(token)
+			if token == "" {
+				continue
+			}
+			id, parseErr := uuid.Parse(token)
+			if parseErr != nil {
+				http.Error(w, "Invalid account_ids", http.StatusBadRequest)
+				return
+			}
+			accountIDs = append(accountIDs, id)
+		}
+		filter.AccountIDs = accountIDs
+	}
+	if filter.StartDate == nil && filter.EndDate == nil {
+		period := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("period")))
+		if period != "" {
+			now := time.Now().UTC()
+			switch period {
+			case "day":
+				start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+				end := start.AddDate(0, 0, 1).Add(-time.Nanosecond)
+				filter.StartDate = &start
+				filter.EndDate = &end
+			case "week":
+				weekday := int(now.Weekday())
+				if weekday == 0 {
+					weekday = 7
+				}
+				start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -(weekday - 1))
+				end := start.AddDate(0, 0, 7).Add(-time.Nanosecond)
+				filter.StartDate = &start
+				filter.EndDate = &end
+			case "month":
+				start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+				end := start.AddDate(0, 1, 0).Add(-time.Nanosecond)
+				filter.StartDate = &start
+				filter.EndDate = &end
+			default:
+				http.Error(w, "Invalid period", http.StatusBadRequest)
+				return
+			}
 		}
 	}
 
@@ -186,7 +242,7 @@ func (t *TransactionRouter) UpdateTransaction(w http.ResponseWriter, r *http.Req
 
 	err = t.transUC.UpdateTransaction(
 		r.Context(), userID, transID, req.CategoryID,
-		req.Name, req.IsIncome, req.Amount, req.CompletedAt, req.Comment,
+		req.Name, req.IsIncome, req.Amount, req.CompletedAt, req.Comment, req.Currency, req.BankFee, req.Status,
 	)
 
 	if err != nil {

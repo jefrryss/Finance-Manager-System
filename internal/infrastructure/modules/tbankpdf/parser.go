@@ -2,6 +2,8 @@ package tbankpdf
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"io"
 	"math"
@@ -26,11 +28,16 @@ type Statement struct {
 }
 
 type TransactionEntry struct {
-	CompletedAt time.Time
-	Amount      int64
-	IsIncome    bool
-	Description string
-	CardNumber  string
+	CompletedAt     time.Time
+	Amount          int64
+	IsIncome        bool
+	Description     string
+	CardNumber      string
+	BankFee         int64
+	SenderAccount   *string
+	ReceiverAccount *string
+	MCCCode         *string
+	ExternalID      *string
 }
 
 var (
@@ -41,6 +48,7 @@ var (
 	reDate           = regexp.MustCompile(`^\d{2}\.\d{2}\.\d{4}$`)
 	reTime           = regexp.MustCompile(`^\d{2}:\d{2}$`)
 	reCard           = regexp.MustCompile(`^(—|\d{4})$`)
+	reMCC            = regexp.MustCompile(`(?i)\bmcc[:\s]*([0-9]{4})\b`)
 )
 
 func ParseStatement(data []byte) (*Statement, error) {
@@ -159,6 +167,7 @@ func parseTransactions(raw string) ([]TransactionEntry, error) {
 			i = j - 1
 			continue
 		}
+		mccCode := extractMCC(description)
 
 		dt, err := time.ParseInLocation("02.01.2006 15:04", lines[i]+" "+lines[i+1], loc)
 		if err != nil {
@@ -172,12 +181,16 @@ func parseTransactions(raw string) ([]TransactionEntry, error) {
 			absAmount = -absAmount
 		}
 
+		externalID := buildExternalID(dt.UTC(), absAmount, isIncome, description, card)
 		transactions = append(transactions, TransactionEntry{
 			CompletedAt: dt.UTC(),
 			Amount:      absAmount,
 			IsIncome:    isIncome,
 			Description: description,
 			CardNumber:  card,
+			BankFee:     0,
+			MCCCode:     mccCode,
+			ExternalID:  &externalID,
 		})
 
 		if j <= i {
@@ -191,6 +204,28 @@ func parseTransactions(raw string) ([]TransactionEntry, error) {
 		return nil, ErrStatementNotSupported
 	}
 	return transactions, nil
+}
+
+func extractMCC(description string) *string {
+	match := reMCC.FindStringSubmatch(description)
+	if len(match) < 2 {
+		return nil
+	}
+	mcc := strings.TrimSpace(match[1])
+	if mcc == "" {
+		return nil
+	}
+	return &mcc
+}
+
+func buildExternalID(ts time.Time, amount int64, isIncome bool, description string, card string) string {
+	sign := "expense"
+	if isIncome {
+		sign = "income"
+	}
+	raw := ts.Format(time.RFC3339Nano) + "|" + strconv.FormatInt(amount, 10) + "|" + sign + "|" + strings.TrimSpace(description) + "|" + strings.TrimSpace(card)
+	sum := sha1.Sum([]byte(raw))
+	return hex.EncodeToString(sum[:])
 }
 
 func splitCleanLines(raw string) []string {

@@ -17,7 +17,10 @@ type AccountRepository interface {
 	AddAccount(ctx context.Context, acc *domain.Account) (uuid.UUID, error)
 	ArchiveAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) error
 	GetAllAccountsByUser(ctx context.Context, userID uuid.UUID) ([]domain.Account, error)
-	ChangeNameAccount(ctx context.Context, name string, userID uuid.UUID, accountID uuid.UUID) error
+	GetAccountByID(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) (*domain.Account, error)
+	UpdateAccountName(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, name string) error
+	UpdateManualAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, name string, balance int64) error
+	UpdateImportedAccountSnapshot(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, balance int64) error
 }
 
 type AccountCategoryRepository interface {
@@ -91,11 +94,11 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 			"#FFDD2D",
 			true,
 			&externalID,
+			statement.Balance,
 		)
 		if accErr != nil {
 			return fmt.Errorf("validation failed: %w", accErr)
 		}
-		acc.Balance = statement.Balance
 
 		accountID, addErr := uc.repo.AddAccount(txCtx, acc)
 		if addErr != nil {
@@ -104,7 +107,7 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 
 		trans := make([]*transactionDomain.Transaction, 0, len(statement.Transactions))
 		for _, rawTx := range statement.Transactions {
-			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome)
+			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
 			tx, txErr := transactionDomain.NewTransaction(
 				userID,
 				accountID,
@@ -119,6 +122,13 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 			if txErr != nil {
 				continue
 			}
+			tx.Currency = "RUB"
+			tx.Status = "completed"
+			tx.BankFee = rawTx.BankFee
+			tx.MCCCode = rawTx.MCCCode
+			tx.SenderAccount = rawTx.SenderAccount
+			tx.ReceiverAccount = rawTx.ReceiverAccount
+			tx.ExternalTransactionID = rawTx.ExternalID
 			trans = append(trans, tx)
 		}
 
@@ -153,6 +163,7 @@ func (uc *AccountUseCase) CreateAccount(
 	colorHex string,
 	isImported bool,
 	externalAccountID *string,
+	initialBalance int64,
 ) error {
 	acc, err := domain.NewAccount(
 		userID,
@@ -162,6 +173,7 @@ func (uc *AccountUseCase) CreateAccount(
 		colorHex,
 		isImported,
 		externalAccountID,
+		initialBalance,
 	)
 	if err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -172,6 +184,33 @@ func (uc *AccountUseCase) CreateAccount(
 		return fmt.Errorf("failed to save account: %w", err)
 	}
 
+	return nil
+}
+
+func (uc *AccountUseCase) UpdateManualAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, name string, balance *int64) error {
+	acc, err := uc.repo.GetAccountByID(ctx, userID, accountID)
+	if err != nil {
+		return fmt.Errorf("account not found: %w", err)
+	}
+	if name == "" {
+		name = acc.NameAccount
+	}
+	if acc.IsImported {
+		if balance != nil {
+			return fmt.Errorf("imported account cannot change manual balance")
+		}
+		if err := uc.repo.UpdateAccountName(ctx, userID, accountID, name); err != nil {
+			return fmt.Errorf("failed to update account name: %w", err)
+		}
+		return nil
+	}
+	nextBalance := acc.Balance
+	if balance != nil {
+		nextBalance = *balance
+	}
+	if err := uc.repo.UpdateManualAccount(ctx, userID, accountID, name, nextBalance); err != nil {
+		return fmt.Errorf("failed to update account: %w", err)
+	}
 	return nil
 }
 
@@ -197,12 +236,86 @@ func (uc *AccountUseCase) RenameAccount(ctx context.Context, userID uuid.UUID, a
 		return domain.ErrEmptyAccountName
 	}
 
-	err := uc.repo.ChangeNameAccount(ctx, newName, userID, accountID)
+	err := uc.repo.UpdateAccountName(ctx, userID, accountID, newName)
 	if err != nil {
 		return fmt.Errorf("failed to rename account: %w", err)
 	}
 
 	return nil
+}
+
+func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, pdfData []byte) (*ImportPDFResult, error) {
+	statement, err := tbankpdf.ParseStatement(pdfData)
+	if err != nil {
+		return nil, err
+	}
+
+	var result ImportPDFResult
+	err = uc.txManager.RunInTransaction(ctx, func(txCtx context.Context) error {
+		acc, accErr := uc.repo.GetAccountByID(txCtx, userID, accountID)
+		if accErr != nil {
+			return fmt.Errorf("account not found: %w", accErr)
+		}
+		if !acc.IsImported {
+			return fmt.Errorf("only imported accounts can be synchronized")
+		}
+
+		categories, catErr := uc.catRepo.GetCategoriesByUser(txCtx, userID)
+		if catErr != nil {
+			return catErr
+		}
+
+		trans := make([]*transactionDomain.Transaction, 0, len(statement.Transactions))
+		for _, rawTx := range statement.Transactions {
+			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
+			tx, txErr := transactionDomain.NewTransaction(
+				userID,
+				accountID,
+				categoryID,
+				rawTx.Description,
+				rawTx.IsIncome,
+				rawTx.Amount,
+				rawTx.CompletedAt,
+				true,
+				nil,
+			)
+			if txErr != nil {
+				continue
+			}
+			tx.Currency = "RUB"
+			tx.Status = "completed"
+			tx.BankFee = rawTx.BankFee
+			tx.MCCCode = rawTx.MCCCode
+			tx.SenderAccount = rawTx.SenderAccount
+			tx.ReceiverAccount = rawTx.ReceiverAccount
+			tx.ExternalTransactionID = rawTx.ExternalID
+			trans = append(trans, tx)
+		}
+
+		if len(trans) > 0 {
+			if insertErr := uc.transRepo.AddTransactions(txCtx, trans); insertErr != nil {
+				return fmt.Errorf("failed to import transactions: %w", insertErr)
+			}
+		}
+
+		if err := uc.repo.UpdateImportedAccountSnapshot(txCtx, userID, accountID, statement.Balance); err != nil {
+			return fmt.Errorf("failed to update imported account balance: %w", err)
+		}
+
+		result = ImportPDFResult{
+			AccountID:            accountID,
+			ImportedTransactions: len(trans),
+			Balance:              statement.Balance,
+			AccountNumber:        statement.AccountNumber,
+			ContractNumber:       statement.ContractNumber,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 func (uc *AccountUseCase) ArchiveAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) error {

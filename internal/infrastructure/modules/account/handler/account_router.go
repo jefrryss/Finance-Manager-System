@@ -27,8 +27,9 @@ func (a *AccountRouter) Route() chi.Router {
 
 	r.Post("/", a.CreateAccount)
 	r.Post("/import/pdf", a.ImportAccountFromPDF)
+	r.Post("/{id}/sync/pdf", a.SyncImportedAccountFromPDF)
 	r.Get("/", a.GetAccounts)
-	r.Put("/{id}", a.RenameAccount)
+	r.Put("/{id}", a.UpdateAccount)
 	r.Delete("/{id}", a.ArchiveAccount)
 
 	return r
@@ -41,10 +42,12 @@ type CreateAccountReq struct {
 	ColorHex          string  `json:"color_hex" example:"#FF0000"`
 	IsImported        bool    `json:"is_imported" example:"false"`
 	ExternalAccountID *string `json:"external_account_id" example:"null"`
+	InitialBalance    int64   `json:"initial_balance" example:"100000"`
 }
 
-type RenameAccountReq struct {
-	Name string `json:"name" example:"Новое название кошелька"`
+type UpdateAccountReq struct {
+	Name           *string `json:"name" example:"Новое название кошелька"`
+	InitialBalance *int64  `json:"initial_balance" example:"150000"`
 }
 
 // @Summary Создать счет
@@ -77,6 +80,7 @@ func (a *AccountRouter) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		req.ColorHex,
 		req.IsImported,
 		req.ExternalAccountID,
+		req.InitialBalance,
 	)
 
 	if err != nil {
@@ -168,16 +172,16 @@ func (a *AccountRouter) GetAccounts(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(accounts)
 }
 
-// @Summary Переименовать счет
+// @Summary Обновить ручной счет
 // @Tags accounts
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
 // @Param id path string true "ID счета"
-// @Param request body RenameAccountReq true "Новое название"
+// @Param request body UpdateAccountReq true "Название и/или начальный баланс"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/accounts/{id} [put]
-func (a *AccountRouter) RenameAccount(w http.ResponseWriter, r *http.Request) {
+func (a *AccountRouter) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -190,13 +194,17 @@ func (a *AccountRouter) RenameAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req RenameAccountReq
+	var req UpdateAccountReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid json", http.StatusBadRequest)
 		return
 	}
 
-	err = a.accountUC.RenameAccount(r.Context(), userID, accountID, req.Name)
+	name := ""
+	if req.Name != nil {
+		name = *req.Name
+	}
+	err = a.accountUC.UpdateManualAccount(r.Context(), userID, accountID, name, req.InitialBalance)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -206,7 +214,7 @@ func (a *AccountRouter) RenameAccount(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
-		"message": "Account renamed",
+		"message": "Account updated",
 	})
 }
 
@@ -241,5 +249,63 @@ func (a *AccountRouter) ArchiveAccount(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
 		"message": "Account archived",
+	})
+}
+
+// @Summary Синхронизировать импортированный счет по PDF выписке
+// @Tags accounts
+// @Security ApiKeyAuth
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path string true "ID счета"
+// @Param file formData file true "PDF выписка Т-Банка"
+// @Success 202 {object} map[string]interface{}
+// @Router /api/v1/accounts/{id}/sync/pdf [post]
+func (a *AccountRouter) SyncImportedAccountFromPDF(w http.ResponseWriter, r *http.Request) {
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	accountID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "Invalid account ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseMultipartForm(25 << 20); err != nil {
+		http.Error(w, "Invalid multipart form", http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "file is required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "failed to read file", http.StatusBadRequest)
+		return
+	}
+
+	result, err := a.accountUC.SyncImportedAccountFromTBankPDF(r.Context(), userID, accountID, data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":                "success",
+		"account_id":            result.AccountID,
+		"imported_transactions": result.ImportedTransactions,
+		"balance":               result.Balance,
+		"account_number":        result.AccountNumber,
+		"contract_number":       result.ContractNumber,
 	})
 }

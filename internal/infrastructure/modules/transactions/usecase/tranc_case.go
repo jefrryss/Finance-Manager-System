@@ -41,10 +41,19 @@ func NewTransactionUseCase(tr TransactionRepository, ar AccountBalanceUpdater, t
 	}
 }
 
-func (uc *TransactionUseCase) CreateManualTransaction(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string) error {
+func (uc *TransactionUseCase) CreateManualTransaction(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string, currency string, bankFee int64, status string) error {
 	trans, err := domain.NewTransaction(userID, accountID, categoryID, name, isIncome, amount, completedAt, false, comment)
 	if err != nil {
 		return fmt.Errorf("validation failed: %w", err)
+	}
+	if currency != "" {
+		trans.Currency = currency
+	}
+	if status != "" {
+		trans.Status = status
+	}
+	if bankFee > 0 {
+		trans.BankFee = bankFee
 	}
 
 	delta := amount
@@ -63,7 +72,7 @@ func (uc *TransactionUseCase) CreateManualTransaction(ctx context.Context, userI
 	})
 }
 
-func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, transID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string) error {
+func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, transID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string, currency string, bankFee int64, status string) error {
 	return uc.txManager.RunInTransaction(ctx, func(ctx context.Context) error {
 		oldTrans, err := uc.transRepo.GetTransaction(ctx, userID, transID)
 		if err != nil {
@@ -71,7 +80,19 @@ func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, tra
 		}
 
 		if oldTrans.IsImported {
-			if amount != oldTrans.Amount || isIncome != oldTrans.IsIncome || !completedAt.Equal(oldTrans.CompletedAt) || name != oldTrans.NameTransaction {
+			nextCurrency := oldTrans.Currency
+			if currency != "" {
+				nextCurrency = currency
+			}
+			nextStatus := oldTrans.Status
+			if status != "" {
+				nextStatus = status
+			}
+			nextBankFee := oldTrans.BankFee
+			if bankFee >= 0 {
+				nextBankFee = bankFee
+			}
+			if amount != oldTrans.Amount || isIncome != oldTrans.IsIncome || !completedAt.Equal(oldTrans.CompletedAt) || name != oldTrans.NameTransaction || nextCurrency != oldTrans.Currency || nextStatus != oldTrans.Status || nextBankFee != oldTrans.BankFee {
 				return domain.ErrCannotModifyImported
 			}
 		} else {
@@ -101,6 +122,15 @@ func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, tra
 		oldTrans.Amount = amount
 		oldTrans.CompletedAt = completedAt
 		oldTrans.Comment = comment
+		if currency != "" {
+			oldTrans.Currency = currency
+		}
+		if status != "" {
+			oldTrans.Status = status
+		}
+		if bankFee >= 0 {
+			oldTrans.BankFee = bankFee
+		}
 
 		if err := uc.transRepo.UpdateTransaction(ctx, oldTrans); err != nil {
 			return fmt.Errorf("failed to update transaction in db: %w", err)

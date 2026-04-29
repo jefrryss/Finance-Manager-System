@@ -21,8 +21,8 @@ func buildImportedAccountName(statement *tbankpdf.Statement) string {
 	return base + " *" + statement.AccountNumber[len(statement.AccountNumber)-4:]
 }
 
-func resolveCategoryID(categories []categoryDomain.Category, description string, isIncome bool) *uuid.UUID {
-	categoryName := classifyCategoryName(description, isIncome)
+func resolveCategoryID(categories []categoryDomain.Category, description string, isIncome bool, mccCode *string) *uuid.UUID {
+	categoryName := classifyCategoryName(description, isIncome, mccCode)
 	normalizedTarget := normalizeKey(categoryName)
 	normalizedFallback := normalizeKey("Другое")
 
@@ -61,8 +61,13 @@ func resolveCategoryID(categories []categoryDomain.Category, description string,
 	return anyTypeID
 }
 
-func classifyCategoryName(description string, isIncome bool) string {
+func classifyCategoryName(description string, isIncome bool, mccCode *string) string {
 	d := normalizeKey(description)
+	if mccCode != nil {
+		if mapped := mapMCCToCategory(*mccCode, isIncome); mapped != "" {
+			return mapped
+		}
+	}
 
 	if isIncome {
 		switch {
@@ -100,6 +105,30 @@ func classifyCategoryName(description string, isIncome bool) string {
 		return "Развлечения"
 	default:
 		return "Другое"
+	}
+}
+
+func mapMCCToCategory(code string, isIncome bool) string {
+	if isIncome {
+		return ""
+	}
+	switch strings.TrimSpace(code) {
+	case "5411", "5422", "5441", "5451", "5462", "5499":
+		return "Продукты"
+	case "5811", "5812", "5813", "5814":
+		return "Кафе и рестораны"
+	case "4111", "4121", "4131", "4789":
+		return "Транспорт"
+	case "5912", "8011", "8021", "8041", "8062", "8099":
+		return "Здоровье"
+	case "4814", "4899", "5732", "5815", "5968":
+		return "Подписки"
+	case "5311", "5331", "5399", "5651", "5691", "5712", "5734", "5942":
+		return "Покупки"
+	case "7995", "7832", "7922", "7997":
+		return "Развлечения"
+	default:
+		return ""
 	}
 }
 
