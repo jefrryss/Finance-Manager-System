@@ -63,9 +63,17 @@ type GoalForecast struct {
 }
 
 type GoalDetails struct {
-	Summary       GoalSummary        `json:"summary"`
-	Contributions []GoalContribution `json:"contributions"`
-	Forecast      GoalForecast       `json:"forecast"`
+	Summary             GoalSummary              `json:"summary"`
+	Contributions       []GoalContribution       `json:"contributions"`
+	Forecast            GoalForecast             `json:"forecast"`
+	ExcessAmount        int64                    `json:"excess_amount"`
+	RedirectSuggestions []GoalRedirectSuggestion `json:"redirect_suggestions,omitempty"`
+}
+
+type GoalRedirectSuggestion struct {
+	GoalID       uuid.UUID `json:"goal_id"`
+	NameGoal     string    `json:"name_goal"`
+	NeededAmount int64     `json:"needed_amount"`
 }
 
 type MonthlyContribution struct {

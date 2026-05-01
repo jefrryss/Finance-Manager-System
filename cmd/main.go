@@ -91,7 +91,7 @@ func main() {
 	categoryUseCase := categoryUC.NewCategoryUseCase(catRepository, transactionRepository, txManager)
 	analyticsUseCase := analyticsUC.NewAnalyticsUseCase(analyticsRepository)
 	recommendationsUseCase := recommendationUC.NewRecommendationUseCase(recommendationsRepository)
-	goalsUseCase := goalUC.NewGoalUseCase(goalsRepository, txManager)
+	goalsUseCase := goalUC.NewGoalUseCase(goalsRepository, transactionRepository, txManager)
 
 	userRouter := userHandler.NewUserRouter(userUseCase)
 	accountRouter := accountHandler.NewAccountRouter(accountUseCase)

@@ -1464,8 +1464,17 @@ const docTemplate = `{
                         "$ref": "#/definitions/domain.GoalContribution"
                     }
                 },
+                "excess_amount": {
+                    "type": "integer"
+                },
                 "forecast": {
                     "$ref": "#/definitions/domain.GoalForecast"
+                },
+                "redirect_suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GoalRedirectSuggestion"
+                    }
                 },
                 "summary": {
                     "$ref": "#/definitions/domain.GoalSummary"
@@ -1482,6 +1491,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "remaining_months": {
+                    "type": "integer"
+                }
+            }
+        },
+        "domain.GoalRedirectSuggestion": {
+            "type": "object",
+            "properties": {
+                "goal_id": {
+                    "type": "string"
+                },
+                "name_goal": {
+                    "type": "string"
+                },
+                "needed_amount": {
                     "type": "integer"
                 }
             }
