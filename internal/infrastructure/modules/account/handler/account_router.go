@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 
 	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/account/usecase"
+	"Finance-Manager-System/internal/infrastructure/modules/tbankpdf"
 )
 
 type AccountRouter struct {
@@ -133,7 +135,11 @@ func (a *AccountRouter) ImportAccountFromPDF(w http.ResponseWriter, r *http.Requ
 	accountName := r.FormValue("name")
 	result, err := a.accountUC.ImportAccountFromTBankPDF(r.Context(), userID, accountName, data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		if errors.Is(err, usecase.ErrInvalidStatement) || errors.Is(err, tbankpdf.ErrInvalidPDF) || errors.Is(err, tbankpdf.ErrStatementNotSupported) {
+			http.Error(w, "Не удалось обработать PDF выписку. Проверьте файл и попробуйте снова", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "Не удалось импортировать счет. Повторите попытку", http.StatusBadRequest)
 		return
 	}
 
@@ -143,6 +149,7 @@ func (a *AccountRouter) ImportAccountFromPDF(w http.ResponseWriter, r *http.Requ
 		"status":                "success",
 		"account_id":            result.AccountID,
 		"imported_transactions": result.ImportedTransactions,
+		"skipped_transactions":  result.SkippedTransactions,
 		"balance":               result.Balance,
 		"account_number":        result.AccountNumber,
 		"contract_number":       result.ContractNumber,
@@ -294,7 +301,14 @@ func (a *AccountRouter) SyncImportedAccountFromPDF(w http.ResponseWriter, r *htt
 
 	result, err := a.accountUC.SyncImportedAccountFromTBankPDF(r.Context(), userID, accountID, data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		switch {
+		case errors.Is(err, usecase.ErrInvalidStatement), errors.Is(err, tbankpdf.ErrInvalidPDF), errors.Is(err, tbankpdf.ErrStatementNotSupported):
+			http.Error(w, "Не удалось обработать PDF выписку. Проверьте файл и попробуйте снова", http.StatusBadRequest)
+		case errors.Is(err, usecase.ErrStatementAccountMismatch):
+			http.Error(w, "Эта выписка относится к другому счету", http.StatusBadRequest)
+		default:
+			http.Error(w, "Не удалось синхронизировать счет. Повторите попытку", http.StatusBadRequest)
+		}
 		return
 	}
 
@@ -304,6 +318,7 @@ func (a *AccountRouter) SyncImportedAccountFromPDF(w http.ResponseWriter, r *htt
 		"status":                "success",
 		"account_id":            result.AccountID,
 		"imported_transactions": result.ImportedTransactions,
+		"skipped_transactions":  result.SkippedTransactions,
 		"balance":               result.Balance,
 		"account_number":        result.AccountNumber,
 		"contract_number":       result.ContractNumber,

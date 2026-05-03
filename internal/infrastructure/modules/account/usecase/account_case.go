@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -28,7 +30,7 @@ type AccountCategoryRepository interface {
 }
 
 type AccountTransactionRepository interface {
-	AddTransactions(ctx context.Context, transactions []*transactionDomain.Transaction) error
+	AddTransactions(ctx context.Context, transactions []*transactionDomain.Transaction) (int, error)
 }
 
 type AccountUseCase struct {
@@ -55,15 +57,21 @@ func NewAccountUseCase(
 type ImportPDFResult struct {
 	AccountID            uuid.UUID `json:"account_id"`
 	ImportedTransactions int       `json:"imported_transactions"`
+	SkippedTransactions  int       `json:"skipped_transactions"`
 	Balance              int64     `json:"balance"`
 	AccountNumber        string    `json:"account_number,omitempty"`
 	ContractNumber       string    `json:"contract_number,omitempty"`
 }
 
+var (
+	ErrInvalidStatement         = errors.New("invalid tbank pdf statement")
+	ErrStatementAccountMismatch = errors.New("statement does not match selected imported account")
+)
+
 func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID uuid.UUID, customName string, pdfData []byte) (*ImportPDFResult, error) {
 	statement, err := tbankpdf.ParseStatement(pdfData)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidStatement
 	}
 
 	if statement.AccountNumber == "" {
@@ -106,6 +114,7 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 		}
 
 		trans := make([]*transactionDomain.Transaction, 0, len(statement.Transactions))
+		skippedCount := 0
 		for _, rawTx := range statement.Transactions {
 			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
 			tx, txErr := transactionDomain.NewTransaction(
@@ -120,6 +129,7 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 				nil,
 			)
 			if txErr != nil {
+				skippedCount++
 				continue
 			}
 			tx.Currency = "RUB"
@@ -132,15 +142,22 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 			trans = append(trans, tx)
 		}
 
+		importedCount := 0
 		if len(trans) > 0 {
-			if insertErr := uc.transRepo.AddTransactions(txCtx, trans); insertErr != nil {
+			var insertErr error
+			importedCount, insertErr = uc.transRepo.AddTransactions(txCtx, trans)
+			if insertErr != nil {
 				return fmt.Errorf("failed to import transactions: %w", insertErr)
 			}
+		}
+		if snapshotErr := uc.repo.UpdateImportedAccountSnapshot(txCtx, userID, accountID, statement.Balance); snapshotErr != nil {
+			return fmt.Errorf("failed to update imported account balance: %w", snapshotErr)
 		}
 
 		result = ImportPDFResult{
 			AccountID:            accountID,
-			ImportedTransactions: len(trans),
+			ImportedTransactions: importedCount,
+			SkippedTransactions:  skippedCount + (len(trans) - importedCount),
 			Balance:              statement.Balance,
 			AccountNumber:        statement.AccountNumber,
 			ContractNumber:       statement.ContractNumber,
@@ -247,7 +264,7 @@ func (uc *AccountUseCase) RenameAccount(ctx context.Context, userID uuid.UUID, a
 func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, pdfData []byte) (*ImportPDFResult, error) {
 	statement, err := tbankpdf.ParseStatement(pdfData)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidStatement
 	}
 
 	var result ImportPDFResult
@@ -259,6 +276,17 @@ func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, u
 		if !acc.IsImported {
 			return fmt.Errorf("only imported accounts can be synchronized")
 		}
+		statementExternalID := strings.TrimSpace(statement.AccountNumber)
+		if statementExternalID == "" {
+			statementExternalID = strings.TrimSpace(statement.ContractNumber)
+		}
+		accountExternalID := ""
+		if acc.ExternalAccountID != nil {
+			accountExternalID = strings.TrimSpace(*acc.ExternalAccountID)
+		}
+		if statementExternalID != "" && accountExternalID != "" && statementExternalID != accountExternalID {
+			return ErrStatementAccountMismatch
+		}
 
 		categories, catErr := uc.catRepo.GetCategoriesByUser(txCtx, userID)
 		if catErr != nil {
@@ -266,7 +294,12 @@ func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, u
 		}
 
 		trans := make([]*transactionDomain.Transaction, 0, len(statement.Transactions))
+		skippedCount := 0
 		for _, rawTx := range statement.Transactions {
+			if acc.LastSyncedAt != nil && !rawTx.CompletedAt.After(acc.LastSyncedAt.UTC()) {
+				skippedCount++
+				continue
+			}
 			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
 			tx, txErr := transactionDomain.NewTransaction(
 				userID,
@@ -280,6 +313,7 @@ func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, u
 				nil,
 			)
 			if txErr != nil {
+				skippedCount++
 				continue
 			}
 			tx.Currency = "RUB"
@@ -292,8 +326,11 @@ func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, u
 			trans = append(trans, tx)
 		}
 
+		importedCount := 0
 		if len(trans) > 0 {
-			if insertErr := uc.transRepo.AddTransactions(txCtx, trans); insertErr != nil {
+			var insertErr error
+			importedCount, insertErr = uc.transRepo.AddTransactions(txCtx, trans)
+			if insertErr != nil {
 				return fmt.Errorf("failed to import transactions: %w", insertErr)
 			}
 		}
@@ -304,7 +341,8 @@ func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, u
 
 		result = ImportPDFResult{
 			AccountID:            accountID,
-			ImportedTransactions: len(trans),
+			ImportedTransactions: importedCount,
+			SkippedTransactions:  skippedCount + (len(trans) - importedCount),
 			Balance:              statement.Balance,
 			AccountNumber:        statement.AccountNumber,
 			ContractNumber:       statement.ContractNumber,
