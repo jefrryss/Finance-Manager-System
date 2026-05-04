@@ -345,6 +345,15 @@ definitions:
       target_date:
         type: string
     type: object
+  handler.UpdateImportedTransReq:
+    properties:
+      category_id:
+        type: string
+      comment:
+        type: string
+      is_hidden:
+        type: boolean
+    type: object
   handler.UpdateTransReq:
     properties:
       amount:
@@ -1089,6 +1098,35 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Обновить транзакцию
+      tags:
+      - transactions
+  /api/v1/transactions/{id}/imported:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID транзакции
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Изменяемые поля
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateImportedTransReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Обновить импортную транзакцию (категория, комментарий, скрытность)
       tags:
       - transactions
   /api/v1/transactions/visibility:

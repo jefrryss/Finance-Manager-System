@@ -1199,6 +1199,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/transactions/{id}/imported": {
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Обновить импортную транзакцию (категория, комментарий, скрытность)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID транзакции",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Изменяемые поля",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateImportedTransReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/change_password": {
             "put": {
                 "security": [
@@ -1829,6 +1875,20 @@ const docTemplate = `{
                 },
                 "target_date": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.UpdateImportedTransReq": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "is_hidden": {
+                    "type": "boolean"
                 }
             }
         },

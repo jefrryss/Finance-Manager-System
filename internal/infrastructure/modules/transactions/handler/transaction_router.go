@@ -31,6 +31,7 @@ func (t *TransactionRouter) Route() chi.Router {
 	r.Post("/", t.CreateTransaction)
 	r.Get("/", t.GetTransactions)
 	r.Put("/{id}", t.UpdateTransaction)
+	r.Patch("/{id}/imported", t.UpdateImportedTransactionMeta)
 	r.Delete("/{id}", t.DeleteTransaction)
 	r.Patch("/visibility", t.ToggleVisibility)
 
@@ -65,6 +66,12 @@ type UpdateTransReq struct {
 type ToggleVisibilityReq struct {
 	TransactionIDs []uuid.UUID `json:"transaction_ids"`
 	Hide           bool        `json:"hide"`
+}
+
+type UpdateImportedTransReq struct {
+	CategoryID *uuid.UUID `json:"category_id"`
+	Comment    *string    `json:"comment"`
+	IsHidden   *bool      `json:"is_hidden"`
 }
 
 // @Summary Создать транзакцию
@@ -308,6 +315,52 @@ func (t *TransactionRouter) ToggleVisibility(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = t.transUC.ToggleTransactionsVisibility(r.Context(), userID, req.TransactionIDs, req.Hide)
+	if err != nil {
+		t.mapError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success"})
+}
+
+// @Summary Обновить импортную транзакцию (категория, комментарий, скрытность)
+// @Tags transactions
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "ID транзакции"
+// @Param request body UpdateImportedTransReq true "Изменяемые поля"
+// @Success 202 {object} map[string]interface{}
+// @Router /api/v1/transactions/{id}/imported [patch]
+func (t *TransactionRouter) UpdateImportedTransactionMeta(w http.ResponseWriter, r *http.Request) {
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	transID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "Invalid transaction ID", http.StatusBadRequest)
+		return
+	}
+
+	var req UpdateImportedTransReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid json", http.StatusBadRequest)
+		return
+	}
+
+	err = t.transUC.UpdateImportedTransactionMeta(
+		r.Context(),
+		userID,
+		transID,
+		req.CategoryID,
+		req.Comment,
+		req.IsHidden,
+	)
 	if err != nil {
 		t.mapError(w, err)
 		return
