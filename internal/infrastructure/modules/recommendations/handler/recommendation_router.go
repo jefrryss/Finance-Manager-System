@@ -88,13 +88,24 @@ func (h *RecommendationRouter) GetBudgetRecommendations(w http.ResponseWriter, r
 		return
 	}
 
+	lastMonthTotalExpense := int64(0)
+	excessiveCategories := 0
+	for _, rec := range result {
+		lastMonthTotalExpense += rec.LastMonthExpense
+		if rec.IsExcessiveShare {
+			excessiveCategories++
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"planned_total":   plannedTotal,
-		"months":          months,
-		"include_hidden":  includeHidden,
-		"account_ids":     accountIDs,
-		"recommendations": result,
+		"planned_total":            plannedTotal,
+		"months":                   months,
+		"include_hidden":           includeHidden,
+		"account_ids":              accountIDs,
+		"last_month_total_expense": lastMonthTotalExpense,
+		"excessive_categories":     excessiveCategories,
+		"recommendations":          result,
 	})
 }
 

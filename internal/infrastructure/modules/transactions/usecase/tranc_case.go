@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,8 @@ type TransactionRepository interface {
 	ShowTransactions(ctx context.Context, userID uuid.UUID, transactionIds []uuid.UUID) error
 	HideTransactions(ctx context.Context, userID uuid.UUID, transactionIds []uuid.UUID) error
 	GetTransactionsByIDs(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID) ([]domain.Transaction, error)
+	ResolveAutoCategoryID(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string) (*uuid.UUID, error)
+	UpsertAutoCategoryRule(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string, categoryID uuid.UUID) error
 }
 
 type AccountBalanceUpdater interface {
@@ -41,10 +44,19 @@ func NewTransactionUseCase(tr TransactionRepository, ar AccountBalanceUpdater, t
 	}
 }
 
-func (uc *TransactionUseCase) CreateManualTransaction(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string) error {
+func (uc *TransactionUseCase) CreateManualTransaction(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string, currency string, bankFee int64, status string) error {
 	trans, err := domain.NewTransaction(userID, accountID, categoryID, name, isIncome, amount, completedAt, false, comment)
 	if err != nil {
 		return fmt.Errorf("validation failed: %w", err)
+	}
+	if currency != "" {
+		trans.Currency = currency
+	}
+	if status != "" {
+		trans.Status = status
+	}
+	if bankFee > 0 {
+		trans.BankFee = bankFee
 	}
 
 	delta := amount
@@ -63,7 +75,7 @@ func (uc *TransactionUseCase) CreateManualTransaction(ctx context.Context, userI
 	})
 }
 
-func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, transID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string) error {
+func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, transID uuid.UUID, categoryID *uuid.UUID, name string, isIncome bool, amount int64, completedAt time.Time, comment *string, currency string, bankFee int64, status string) error {
 	return uc.txManager.RunInTransaction(ctx, func(ctx context.Context) error {
 		oldTrans, err := uc.transRepo.GetTransaction(ctx, userID, transID)
 		if err != nil {
@@ -71,7 +83,19 @@ func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, tra
 		}
 
 		if oldTrans.IsImported {
-			if amount != oldTrans.Amount || isIncome != oldTrans.IsIncome || !completedAt.Equal(oldTrans.CompletedAt) || name != oldTrans.NameTransaction {
+			nextCurrency := oldTrans.Currency
+			if currency != "" {
+				nextCurrency = currency
+			}
+			nextStatus := oldTrans.Status
+			if status != "" {
+				nextStatus = status
+			}
+			nextBankFee := oldTrans.BankFee
+			if bankFee >= 0 {
+				nextBankFee = bankFee
+			}
+			if amount != oldTrans.Amount || isIncome != oldTrans.IsIncome || !completedAt.Equal(oldTrans.CompletedAt) || name != oldTrans.NameTransaction || nextCurrency != oldTrans.Currency || nextStatus != oldTrans.Status || nextBankFee != oldTrans.BankFee {
 				return domain.ErrCannotModifyImported
 			}
 		} else {
@@ -101,9 +125,23 @@ func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, tra
 		oldTrans.Amount = amount
 		oldTrans.CompletedAt = completedAt
 		oldTrans.Comment = comment
+		if currency != "" {
+			oldTrans.Currency = currency
+		}
+		if status != "" {
+			oldTrans.Status = status
+		}
+		if bankFee >= 0 {
+			oldTrans.BankFee = bankFee
+		}
 
 		if err := uc.transRepo.UpdateTransaction(ctx, oldTrans); err != nil {
 			return fmt.Errorf("failed to update transaction in db: %w", err)
+		}
+		if oldTrans.IsImported && categoryID != nil {
+			if upsertErr := uc.transRepo.UpsertAutoCategoryRule(ctx, userID, oldTrans.IsIncome, oldTrans.MCCCode, oldTrans.NameTransaction, *categoryID); upsertErr != nil {
+				return fmt.Errorf("failed to save auto-category rule: %w", upsertErr)
+			}
 		}
 
 		if balanceDelta != 0 {
@@ -111,6 +149,69 @@ func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, tra
 				return fmt.Errorf("failed to update account balance during update: %w", err)
 			}
 		}
+		return nil
+	})
+}
+
+func (uc *TransactionUseCase) UpdateImportedTransactionMeta(
+	ctx context.Context,
+	userID uuid.UUID,
+	transID uuid.UUID,
+	categoryID *uuid.UUID,
+	comment *string,
+	isHidden *bool,
+) error {
+	return uc.txManager.RunInTransaction(ctx, func(txCtx context.Context) error {
+		trans, err := uc.transRepo.GetTransaction(txCtx, userID, transID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch transaction: %w", err)
+		}
+		if !trans.IsImported {
+			return domain.ErrCannotModifyImported
+		}
+
+		if categoryID != nil {
+			trans.CategoryID = categoryID
+			if upsertErr := uc.transRepo.UpsertAutoCategoryRule(txCtx, userID, trans.IsIncome, trans.MCCCode, trans.NameTransaction, *categoryID); upsertErr != nil {
+				return fmt.Errorf("failed to save auto-category rule: %w", upsertErr)
+			}
+		}
+		if comment != nil {
+			cleaned := strings.TrimSpace(*comment)
+			if cleaned == "" {
+				trans.Comment = nil
+			} else {
+				trans.Comment = &cleaned
+			}
+		}
+
+		if isHidden != nil && trans.IsHidden != *isHidden {
+			var delta int64
+			if *isHidden {
+				if trans.IsIncome {
+					delta = -trans.Amount
+				} else {
+					delta = trans.Amount
+				}
+			} else {
+				if trans.IsIncome {
+					delta = trans.Amount
+				} else {
+					delta = -trans.Amount
+				}
+			}
+			if delta != 0 {
+				if err := uc.accountRepo.UpdateBalance(txCtx, userID, trans.AccountID, delta); err != nil {
+					return fmt.Errorf("failed to update account balance: %w", err)
+				}
+			}
+			trans.IsHidden = *isHidden
+		}
+
+		if err := uc.transRepo.UpdateTransaction(txCtx, trans); err != nil {
+			return fmt.Errorf("failed to update imported transaction: %w", err)
+		}
+
 		return nil
 	})
 }
