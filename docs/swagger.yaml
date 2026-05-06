@@ -1,0 +1,517 @@
+basePath: /
+definitions:
+  domain.Account:
+    properties:
+      account_id:
+        type: string
+      account_type:
+        type: string
+      balance:
+        type: integer
+      color_hex:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      external_account_id:
+        type: string
+      is_archived:
+        type: boolean
+      is_imported:
+        type: boolean
+      last_synced_at:
+        type: string
+      name_account:
+        type: string
+      user_id:
+        type: string
+    type: object
+  domain.Category:
+    properties:
+      category_id:
+        type: string
+      icon_url:
+        type: string
+      is_custom:
+        type: boolean
+      is_income:
+        type: boolean
+      name_category:
+        type: string
+      user_id:
+        type: string
+    type: object
+  domain.Transaction:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: integer
+      category_id:
+        type: string
+      comment:
+        type: string
+      completed_at:
+        type: string
+      is_hidden:
+        type: boolean
+      is_imported:
+        type: boolean
+      is_income:
+        type: boolean
+      name_transaction:
+        type: string
+      transaction_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handler.ChangePasswordReq:
+    properties:
+      id:
+        type: string
+      password:
+        type: string
+    type: object
+  handler.CreateAccountReq:
+    properties:
+      account_type:
+        example: manual
+        type: string
+      color_hex:
+        example: '#FF0000'
+        type: string
+      currency:
+        example: RUB
+        type: string
+      external_account_id:
+        example: "null"
+        type: string
+      is_imported:
+        example: false
+        type: boolean
+      name:
+        example: Мой кошелек
+        type: string
+    type: object
+  handler.CreateCategoryReq:
+    properties:
+      icon_url:
+        type: string
+      is_income:
+        type: boolean
+      name:
+        type: string
+    type: object
+  handler.CreateTransReq:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: integer
+      category_id:
+        type: string
+      comment:
+        type: string
+      completed_at:
+        type: string
+      is_income:
+        type: boolean
+      name:
+        type: string
+    type: object
+  handler.DeleteCategoryReq:
+    properties:
+      replacement_category_id:
+        type: string
+    type: object
+  handler.RegisterReq:
+    properties:
+      email:
+        type: string
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  handler.RenameAccountReq:
+    properties:
+      name:
+        example: Новое название кошелька
+        type: string
+    type: object
+  handler.ToggleVisibilityReq:
+    properties:
+      hide:
+        type: boolean
+      transaction_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  handler.UpdateCategoryReq:
+    properties:
+      icon_url:
+        type: string
+      name:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API для приложения по управлению личными финансами.
+  title: Finance Manager API
+  version: "1.0"
+paths:
+  /api/v1/accounts:
+    get:
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Account'
+            type: array
+      summary: Получить все активные счета
+      tags:
+      - accounts
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: Данные счета
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateAccountReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Создать счет
+      tags:
+      - accounts
+  /api/v1/accounts/{id}:
+    delete:
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: ID счета
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Архивировать (удалить) счет
+      tags:
+      - accounts
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: ID счета
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Новое название
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RenameAccountReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Переименовать счет
+      tags:
+      - accounts
+  /api/v1/categories:
+    get:
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Category'
+            type: array
+      summary: Получить категории
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: Данные категории
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateCategoryReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Создать категорию
+      tags:
+      - categories
+  /api/v1/categories/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: ID категории
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Опционально ID для переноса
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/handler.DeleteCategoryReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Удалить категорию
+      tags:
+      - categories
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: ID категории
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Новые данные
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateCategoryReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Обновить категорию
+      tags:
+      - categories
+  /api/v1/transactions:
+    get:
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Transaction'
+            type: array
+      summary: Получить транзакции
+      tags:
+      - transactions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: Данные транзакции
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateTransReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Создать транзакцию
+      tags:
+      - transactions
+  /api/v1/transactions/{id}:
+    delete:
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: ID транзакции
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Удалить транзакцию
+      tags:
+      - transactions
+  /api/v1/transactions/visibility:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пользователя
+        in: header
+        name: X-User-ID
+        required: true
+        type: string
+      - description: IDs транзакций и статус
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ToggleVisibilityReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Изменить видимость транзакций
+      tags:
+      - transactions
+  /api/v1/users/change_password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные для смены пароля
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ChangePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Изменить пароль
+      tags:
+      - users
+  /api/v1/users/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные для регистрации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterReq'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Регистрация пользователя
+      tags:
+      - users
+swagger: "2.0"
