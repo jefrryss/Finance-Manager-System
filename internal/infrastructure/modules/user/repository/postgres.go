@@ -48,7 +48,7 @@ func (u *UserRepository) CheckExistUser(ctx context.Context, login string, email
 		"email": email,
 	}
 
-	query := `SELECT EXISTS(SELECT 1 FROM Users WHERE email = :email AND login = :login)`
+	query := `SELECT EXISTS(SELECT 1 FROM Users WHERE email = :email OR login = :login)`
 
 	query, args, err := u.db.BindNamed(query, params)
 	if err != nil {
