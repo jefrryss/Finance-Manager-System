@@ -55,6 +55,7 @@ func (tr *TransRepository) ShowTransactions(ctx context.Context, userId uuid.UUI
 	if err != nil {
 		return fmt.Errorf("ошибка формирования In-запроса: %w", err)
 	}
+
 	query = q.Rebind(query)
 	_, err = q.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -73,6 +74,7 @@ func (tr *TransRepository) HideTransactions(ctx context.Context, userId uuid.UUI
 	if err != nil {
 		return fmt.Errorf("ошибка формирования In-запроса: %w", err)
 	}
+
 	query = q.Rebind(query)
 	_, err = q.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -153,7 +155,11 @@ func (tr *TransRepository) GetAllTransactions(ctx context.Context, userID uuid.U
 	q := database.GetQueryer(ctx, tr.db)
 	transactions := make([]domain.Transaction, 0)
 
-	query := `SELECT * FROM Transactions WHERE user_id = $1 ORDER BY completed_at DESC`
+	query := `
+        SELECT * FROM Transactions 
+        WHERE user_id = $1 
+        ORDER BY completed_at DESC
+    `
 
 	err := q.SelectContext(ctx, &transactions, query, userID)
 	if err != nil {
@@ -215,6 +221,7 @@ func (tr *TransRepository) GetTransactionsByIDs(ctx context.Context, userID uuid
 		return nil, nil
 	}
 	q := database.GetQueryer(ctx, tr.db)
+
 	transactions := make([]domain.Transaction, 0)
 	query := `SELECT * FROM Transactions WHERE user_id = ? AND transaction_id IN (?)`
 
@@ -222,11 +229,13 @@ func (tr *TransRepository) GetTransactionsByIDs(ctx context.Context, userID uuid
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)
 	}
+
 	query = q.Rebind(query)
 
 	err = q.SelectContext(ctx, &transactions, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get transactions by IDs: %w", err)
 	}
+
 	return transactions, nil
 }
