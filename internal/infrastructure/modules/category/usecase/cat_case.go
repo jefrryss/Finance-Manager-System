@@ -13,6 +13,7 @@ import (
 
 var (
 	ErrCannotModifyDefaultCategory = errors.New("cannot modify or delete default categories")
+	ErrReplacementCategoryRequired = errors.New("replacement category is required")
 )
 
 type CategoryRepository interface {
@@ -100,18 +101,20 @@ func (uc *CategoryUseCase) DeleteCategory(ctx context.Context, userID uuid.UUID,
 			return ErrCannotModifyDefaultCategory
 		}
 
-		if replacementCategoryID != nil {
-			replacementCat, err := uc.catRepo.GetCategoryByID(ctx, userID, *replacementCategoryID)
-			if err != nil {
-				return fmt.Errorf("replacement category not found: %w", err)
-			}
-			if replacementCat.IsIncome != cat.IsIncome {
-				return fmt.Errorf("cannot move transactions to a category of a different type")
-			}
+		if replacementCategoryID == nil {
+			return ErrReplacementCategoryRequired
+		}
 
-			if err := uc.transRepo.MoveTransactionsCategory(ctx, userID, categoryID, *replacementCategoryID); err != nil {
-				return fmt.Errorf("failed to move transactions: %w", err)
-			}
+		replacementCat, err := uc.catRepo.GetCategoryByID(ctx, userID, *replacementCategoryID)
+		if err != nil {
+			return fmt.Errorf("replacement category not found: %w", err)
+		}
+		if replacementCat.IsIncome != cat.IsIncome {
+			return fmt.Errorf("cannot move transactions to a category of a different type")
+		}
+
+		if err := uc.transRepo.MoveTransactionsCategory(ctx, userID, categoryID, *replacementCategoryID); err != nil {
+			return fmt.Errorf("failed to move transactions: %w", err)
 		}
 
 		if err := uc.catRepo.DeleteCategory(ctx, userID, categoryID); err != nil {
@@ -120,4 +123,29 @@ func (uc *CategoryUseCase) DeleteCategory(ctx context.Context, userID uuid.UUID,
 
 		return nil
 	})
+}
+
+func (uc *CategoryUseCase) GetReplacementCategories(ctx context.Context, userID uuid.UUID, categoryID uuid.UUID) ([]domain.Category, error) {
+	cat, err := uc.catRepo.GetCategoryByID(ctx, userID, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("category not found: %w", err)
+	}
+
+	categories, err := uc.catRepo.GetCategoriesByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch categories: %w", err)
+	}
+
+	options := make([]domain.Category, 0, len(categories))
+	for _, c := range categories {
+		if c.CategoryID == categoryID {
+			continue
+		}
+		if c.IsIncome != cat.IsIncome {
+			continue
+		}
+		options = append(options, c)
+	}
+
+	return options, nil
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -171,6 +172,22 @@ func (c *CategoryRouter) DeleteCategory(w http.ResponseWriter, r *http.Request) 
 
 	err = c.categoryUC.DeleteCategory(r.Context(), userID, catID, req.ReplacementCategoryID)
 	if err != nil {
+		if errors.Is(err, usecase.ErrReplacementCategoryRequired) {
+			options, optionsErr := c.categoryUC.GetReplacementCategories(r.Context(), userID, catID)
+			if optionsErr != nil {
+				http.Error(w, optionsErr.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":              "replacement_required",
+				"message":             "choose replacement category",
+				"replacement_options": options,
+			})
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
