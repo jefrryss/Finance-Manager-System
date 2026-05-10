@@ -3,7 +3,6 @@ package postgres
 import (
 	"Finance-Manager-System/configs"
 	"fmt"
-	"log"
 
 	"github.com/jmoiron/sqlx"
 
@@ -28,7 +27,7 @@ func NewDB(cfg *configs.Config) (*sqlx.DB, error) {
 
 	db, err := sqlx.Connect(driverName, url)
 	if err != nil {
-		log.Fatal("fatal to connect to DB %w", err)
+		return nil, fmt.Errorf("fatal to connect to db: %w", err)
 	}
 
 	return db, nil
