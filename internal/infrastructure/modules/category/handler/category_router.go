@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/category/usecase"
 )
 
@@ -48,16 +49,16 @@ type DeleteCategoryReq struct {
 
 // @Summary Создать категорию
 // @Tags categories
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param request body CreateCategoryReq true "Данные категории"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/categories [post]
 func (c *CategoryRouter) CreateCategory(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -83,14 +84,14 @@ func (c *CategoryRouter) CreateCategory(w http.ResponseWriter, r *http.Request) 
 
 // @Summary Получить категории
 // @Tags categories
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Success 200 {array} domain.Category
 // @Router /api/v1/categories [get]
 func (c *CategoryRouter) GetCategories(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -106,17 +107,17 @@ func (c *CategoryRouter) GetCategories(w http.ResponseWriter, r *http.Request) {
 
 // @Summary Обновить категорию
 // @Tags categories
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param id path string true "ID категории"
 // @Param request body UpdateCategoryReq true "Новые данные"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/categories/{id} [put]
 func (c *CategoryRouter) UpdateCategory(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -145,17 +146,17 @@ func (c *CategoryRouter) UpdateCategory(w http.ResponseWriter, r *http.Request) 
 
 // @Summary Удалить категорию
 // @Tags categories
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param id path string true "ID категории"
 // @Param request body DeleteCategoryReq false "Опционально ID для переноса"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/categories/{id} [delete]
 func (c *CategoryRouter) DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 

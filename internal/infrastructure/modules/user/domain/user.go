@@ -9,11 +9,13 @@ import (
 )
 
 var (
-	ErrUserAlreadyExists = errors.New("user already exixst")
-	ErrInvalidEmail      = errors.New("invalid email")
-	ErrInvalidPassword   = errors.New("invalid password")
-	ErrInvalidLogin      = errors.New("invalid login")
+	ErrUserAlreadyExists  = errors.New("user already exists")
+	ErrInvalidEmail       = errors.New("invalid email")
+	ErrInvalidPassword    = errors.New("invalid password")
+	ErrInvalidLogin       = errors.New("invalid login")
+	ErrInvalidCredentials = errors.New("invalid email/login or password")
 )
+
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
 type User struct {
@@ -26,7 +28,6 @@ type User struct {
 }
 
 func NewUser(email string, login string, hashPassword string) (*User, error) {
-
 	if !emailRegex.MatchString(email) {
 		return nil, ErrInvalidEmail
 	}

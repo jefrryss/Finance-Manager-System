@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/account/usecase"
 )
 
@@ -46,16 +47,16 @@ type RenameAccountReq struct {
 
 // @Summary Создать счет
 // @Tags accounts
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param request body CreateAccountReq true "Данные счета"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/accounts [post]
 func (a *AccountRouter) CreateAccount(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -91,14 +92,14 @@ func (a *AccountRouter) CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 // @Summary Получить все активные счета
 // @Tags accounts
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Success 200 {array} domain.Account
 // @Router /api/v1/accounts [get]
 func (a *AccountRouter) GetAccounts(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -114,17 +115,17 @@ func (a *AccountRouter) GetAccounts(w http.ResponseWriter, r *http.Request) {
 
 // @Summary Переименовать счет
 // @Tags accounts
+// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param id path string true "ID счета"
 // @Param request body RenameAccountReq true "Новое название"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/accounts/{id} [put]
 func (a *AccountRouter) RenameAccount(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -156,15 +157,15 @@ func (a *AccountRouter) RenameAccount(w http.ResponseWriter, r *http.Request) {
 
 // @Summary Архивировать (удалить) счет
 // @Tags accounts
+// @Security ApiKeyAuth
 // @Produce json
-// @Param X-User-ID header string true "ID пользователя"
 // @Param id path string true "ID счета"
 // @Success 202 {object} map[string]interface{}
 // @Router /api/v1/accounts/{id} [delete]
 func (a *AccountRouter) ArchiveAccount(w http.ResponseWriter, r *http.Request) {
-	userID, err := uuid.Parse(r.Header.Get("X-User-ID"))
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
-		http.Error(w, "Missing or invalid X-User-ID header", http.StatusUnauthorized)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
