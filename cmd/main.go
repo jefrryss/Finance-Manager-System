@@ -41,9 +41,15 @@ import (
 	analyticsRepo "Finance-Manager-System/internal/infrastructure/modules/analytics/repository"
 	analyticsUC "Finance-Manager-System/internal/infrastructure/modules/analytics/usecase"
 
+	// Модуль Recommendations
 	recommendationHandler "Finance-Manager-System/internal/infrastructure/modules/recommendations/handler"
 	recommendationRepo "Finance-Manager-System/internal/infrastructure/modules/recommendations/repository"
 	recommendationUC "Finance-Manager-System/internal/infrastructure/modules/recommendations/usecase"
+
+	// Модуль Goals
+	goalHandler "Finance-Manager-System/internal/infrastructure/modules/goals/handler"
+	goalRepo "Finance-Manager-System/internal/infrastructure/modules/goals/repository"
+	goalUC "Finance-Manager-System/internal/infrastructure/modules/goals/usecase"
 )
 
 // @title Finance Manager API
@@ -75,6 +81,7 @@ func main() {
 	transactionRepository := transRepo.NewTransRepository(db)
 	analyticsRepository := analyticsRepo.NewAnalyticsRepository(db)
 	recommendationsRepository := recommendationRepo.NewRecommendationRepository(db)
+	goalsRepository := goalRepo.NewGoalRepo(db)
 
 	// слой UseCase
 	userUseCase := userUC.NewUserCase(userRepository, cnf.JWTSecret, catRepository)
@@ -83,6 +90,7 @@ func main() {
 	categoryUseCase := categoryUC.NewCategoryUseCase(catRepository, transactionRepository, txManager)
 	analyticsUseCase := analyticsUC.NewAnalyticsUseCase(analyticsRepository)
 	recommendationsUseCase := recommendationUC.NewRecommendationUseCase(recommendationsRepository)
+	goalsUseCase := goalUC.NewGoalUseCase(goalsRepository, txManager)
 
 	// слой Handler
 	userRouter := userHandler.NewUserRouter(userUseCase)
@@ -91,6 +99,7 @@ func main() {
 	transactionRouter := transHandler.NewTransactionRouter(transactionUseCase)
 	analyticsRouter := analyticsHandler.NewAnalyticsRouter(analyticsUseCase)
 	recommendationRouter := recommendationHandler.NewRecommendationRouter(recommendationsUseCase)
+	goalsRouter := goalHandler.NewGoalRouter(goalsUseCase)
 
 	// роутер Chi
 	r := chi.NewRouter()
@@ -122,13 +131,14 @@ func main() {
 			r.Mount("/transactions", transactionRouter.Route())
 			r.Mount("/analytics", analyticsRouter.Route())
 			r.Mount("/recommendations", recommendationRouter.Route())
+			r.Mount("/goals", goalsRouter.Route())
 		})
 	})
 
 	// Запуск сервера
 	serverAddr := net.JoinHostPort(cnf.HttpServer.Adress, cnf.HttpServer.Port)
 	log.Printf("Server started on: %s\n", serverAddr)
-	log.Printf("Swagger UI is available at: http://%s/swagger/index.htmln", serverAddr)
+	log.Printf("Swagger UI is available at: http://%s/swagger/index.html\n", serverAddr)
 
 	err = http.ListenAndServe(serverAddr, r)
 	if err != nil {

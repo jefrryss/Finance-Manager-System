@@ -78,3 +78,44 @@ CREATE TABLE IF NOT EXISTS Transactions (
         REFERENCES Accounts(account_id)
         ON DELETE CASCADE
 ) WITH (fillfactor = 85);
+
+CREATE TABLE IF NOT EXISTS Goals (
+    goal_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    name_goal VARCHAR(255) NOT NULL,
+    target_amount BIGINT NOT NULL CHECK (target_amount > 0),
+    current_amount BIGINT NOT NULL DEFAULT 0,
+    target_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_user_goal
+        FOREIGN KEY (user_id)
+        REFERENCES Users(user_id)
+        ON DELETE CASCADE
+) WITH (fillfactor = 85);
+
+CREATE TABLE IF NOT EXISTS GoalContributions (
+    contribution_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    goal_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    amount BIGINT NOT NULL CHECK (amount > 0),
+    contribution_date TIMESTAMPTZ NOT NULL,
+    transaction_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_goal_contribution_goal
+        FOREIGN KEY (goal_id)
+        REFERENCES Goals(goal_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_goal_contribution_user
+        FOREIGN KEY (user_id)
+        REFERENCES Users(user_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_goal_contribution_transaction
+        FOREIGN KEY (transaction_id)
+        REFERENCES Transactions(transaction_id)
+        ON DELETE SET NULL
+) WITH (fillfactor = 85);
