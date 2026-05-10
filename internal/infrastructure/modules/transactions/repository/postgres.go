@@ -30,10 +30,10 @@ func (tr *TransRepository) MoveTransactionsCategory(ctx context.Context, userID 
 	return err
 }
 
-func (tr *TransRepository) AddTransactions(ctx context.Context, transactions []*domain.Transaction) error {
+func (tr *TransRepository) AddTransactions(ctx context.Context, transactions []*domain.Transaction) (int, error) {
 	q := database.GetQueryer(ctx, tr.db)
 	if err := tr.ensureTransactionsSchema(ctx, q); err != nil {
-		return err
+		return 0, err
 	}
 	query := `
         INSERT INTO Transactions (
@@ -50,11 +50,15 @@ func (tr *TransRepository) AddTransactions(ctx context.Context, transactions []*
         WHERE external_transaction_id IS NOT NULL
         DO NOTHING
     `
-	_, err := q.NamedExecContext(ctx, query, transactions)
+	res, err := q.NamedExecContext(ctx, query, transactions)
 	if err != nil {
-		return fmt.Errorf("ошибка NamedExecContext: %w", err)
+		return 0, fmt.Errorf("ошибка NamedExecContext: %w", err)
 	}
-	return nil
+	rowsAffected, rowsErr := res.RowsAffected()
+	if rowsErr != nil {
+		return 0, fmt.Errorf("failed to get affected rows: %w", rowsErr)
+	}
+	return int(rowsAffected), nil
 }
 
 func (tr *TransRepository) ShowTransactions(ctx context.Context, userId uuid.UUID, transactionIds []uuid.UUID) error {
