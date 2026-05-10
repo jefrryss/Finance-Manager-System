@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AddAccountView: View {
     @Environment(\.dismiss) var dismiss
     @State private var viewModel = AddAccountViewModel()
+    @State private var showingFilePicker = false
     var onSave: () -> Void
     
     let colors = ["#00E676", "#2196F3", "#FFEB3B", "#F44336", "#9C27B0"]
@@ -10,7 +12,7 @@ struct AddAccountView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.finexaBackground
+                AppTheme.finexaBackground.ignoresSafeArea()
                 VStack(spacing: 24) {
                     Text("Новый счет").font(.title.bold()).foregroundColor(.white)
                     
@@ -40,6 +42,20 @@ struct AddAccountView: View {
                             .padding(.horizontal)
                     }
                     
+                    Button {
+                        showingFilePicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.text.viewfinder")
+                            Text("Импорт из выписки Т-Банка")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(16)
+                    }
+                    
                     FintechButton(title: "Создать", isLoading: viewModel.isLoading, isDisabled: viewModel.name.isEmpty) {
                         Task {
                             if await viewModel.saveAccount() {
@@ -54,6 +70,25 @@ struct AddAccountView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Отмена") { dismiss() }.foregroundColor(.white)
+                }
+            }
+            .fileImporter(
+                isPresented: $showingFilePicker,
+                allowedContentTypes: [UTType.pdf],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let selectedURL = urls.first else { return }
+                    Task {
+                        let success = await viewModel.importFromPDF(fileURL: selectedURL)
+                        if success {
+                            onSave()
+                            dismiss()
+                        }
+                    }
+                case .failure:
+                    break
                 }
             }
         }

@@ -15,6 +15,13 @@ struct CreateAccountResponse: Codable {
     let message: String?
 }
 
+struct ImportAccountResponse: Codable {
+    let status: String
+    let accountId: String
+    let importedTransactions: Int
+    let balance: Int64
+}
+
 @Observable
 class AddAccountViewModel {
     var name = ""
@@ -47,14 +54,41 @@ class AddAccountViewModel {
         )
         
         do {
-            let res: CreateAccountResponse = try await NetworkManager.shared.post(endpoint: "/accounts", body: requestBody)
-            print("✅ Счет создан: \(res.message ?? "")")
+            let _: CreateAccountResponse = try await NetworkManager.shared.post(endpoint: "/accounts", body: requestBody)
             isLoading = false
             return true
         } catch {
             isLoading = false
             self.errorMessage = "Ошибка сервера: \(error.localizedDescription)"
-            print("❌ Ошибка создания счета: \(error)")
+            return false
+        }
+    }
+    
+    func importFromPDF(fileURL: URL) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        
+        guard fileURL.startAccessingSecurityScopedResource() else {
+            errorMessage = "Нет доступа к файлу"
+            isLoading = false
+            return false
+        }
+        
+        defer { fileURL.stopAccessingSecurityScopedResource() }
+        
+        do {
+            let pdfData = try Data(contentsOf: fileURL)
+            let _: ImportAccountResponse = try await NetworkManager.shared.uploadPDF(
+                endpoint: "/accounts/import/pdf",
+                fileData: pdfData,
+                accountName: name
+            )
+            
+            isLoading = false
+            return true
+        } catch {
+            isLoading = false
+            self.errorMessage = "Ошибка импорта: \(error.localizedDescription)"
             return false
         }
     }
