@@ -79,7 +79,7 @@ func (r *AccountRepo) ChangeNameAccount(ctx context.Context, name string, userID
 	return nil
 }
 
-func (r *AccountRepo) AddAccount(ctx context.Context, acc *domain.Account) error {
+func (r *AccountRepo) AddAccount(ctx context.Context, acc *domain.Account) (uuid.UUID, error) {
 	q := database.GetQueryer(ctx, r.db)
 	query := `
         INSERT INTO Accounts (
@@ -92,14 +92,21 @@ func (r *AccountRepo) AddAccount(ctx context.Context, acc *domain.Account) error
             :account_type, :color_hex, :is_archived, :name_account, 
             :currency, :last_synced_at, :created_at
         )
+        RETURNING account_id
     `
 
-	_, err := q.NamedExecContext(ctx, query, acc)
+	queryStr, args, err := sqlx.Named(query, acc)
 	if err != nil {
-		return fmt.Errorf("failed to add account: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to process named query: %w", err)
+	}
+	queryStr = q.Rebind(queryStr)
+
+	var accountID uuid.UUID
+	if err := q.QueryRowContext(ctx, queryStr, args...).Scan(&accountID); err != nil {
+		return uuid.Nil, fmt.Errorf("failed to add account: %w", err)
 	}
 
-	return nil
+	return accountID, nil
 }
 
 func (r *AccountRepo) ArchiveAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) error {

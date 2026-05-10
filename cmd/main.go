@@ -85,7 +85,7 @@ func main() {
 
 	// слой UseCase
 	userUseCase := userUC.NewUserCase(userRepository, cnf.JWTSecret, catRepository)
-	accountUseCase := accountUC.NewAccountUseCase(accRepository)
+	accountUseCase := accountUC.NewAccountUseCase(accRepository, catRepository, transactionRepository, txManager)
 	transactionUseCase := transUC.NewTransactionUseCase(transactionRepository, accRepository, txManager)
 	categoryUseCase := categoryUC.NewCategoryUseCase(catRepository, transactionRepository, txManager)
 	analyticsUseCase := analyticsUC.NewAnalyticsUseCase(analyticsRepository)
