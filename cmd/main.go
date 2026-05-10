@@ -40,6 +40,10 @@ import (
 	analyticsHandler "Finance-Manager-System/internal/infrastructure/modules/analytics/handler"
 	analyticsRepo "Finance-Manager-System/internal/infrastructure/modules/analytics/repository"
 	analyticsUC "Finance-Manager-System/internal/infrastructure/modules/analytics/usecase"
+
+	recommendationHandler "Finance-Manager-System/internal/infrastructure/modules/recommendations/handler"
+	recommendationRepo "Finance-Manager-System/internal/infrastructure/modules/recommendations/repository"
+	recommendationUC "Finance-Manager-System/internal/infrastructure/modules/recommendations/usecase"
 )
 
 // @title Finance Manager API
@@ -70,6 +74,7 @@ func main() {
 	catRepository := categoryRepo.NewCategoryRepo(db)
 	transactionRepository := transRepo.NewTransRepository(db)
 	analyticsRepository := analyticsRepo.NewAnalyticsRepository(db)
+	recommendationsRepository := recommendationRepo.NewRecommendationRepository(db)
 
 	// слой UseCase
 	userUseCase := userUC.NewUserCase(userRepository, cnf.JWTSecret, catRepository)
@@ -77,6 +82,7 @@ func main() {
 	transactionUseCase := transUC.NewTransactionUseCase(transactionRepository, accRepository, txManager)
 	categoryUseCase := categoryUC.NewCategoryUseCase(catRepository, transactionRepository, txManager)
 	analyticsUseCase := analyticsUC.NewAnalyticsUseCase(analyticsRepository)
+	recommendationsUseCase := recommendationUC.NewRecommendationUseCase(recommendationsRepository)
 
 	// слой Handler
 	userRouter := userHandler.NewUserRouter(userUseCase)
@@ -84,6 +90,7 @@ func main() {
 	categoryRouter := categoryHandler.NewCategoryRouter(categoryUseCase)
 	transactionRouter := transHandler.NewTransactionRouter(transactionUseCase)
 	analyticsRouter := analyticsHandler.NewAnalyticsRouter(analyticsUseCase)
+	recommendationRouter := recommendationHandler.NewRecommendationRouter(recommendationsUseCase)
 
 	// роутер Chi
 	r := chi.NewRouter()
@@ -114,6 +121,7 @@ func main() {
 			r.Mount("/categories", categoryRouter.Route())
 			r.Mount("/transactions", transactionRouter.Route())
 			r.Mount("/analytics", analyticsRouter.Route())
+			r.Mount("/recommendations", recommendationRouter.Route())
 		})
 	})
 
