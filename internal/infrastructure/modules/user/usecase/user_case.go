@@ -13,16 +13,16 @@ import (
 )
 
 type UserCase struct {
-	db *repository.UserRepository
+	db           *repository.UserRepository
+	jwtSecretKey []byte
 }
 
-func NewUserCase(db *repository.UserRepository) *UserCase {
+func NewUserCase(db *repository.UserRepository, jwtSecret string) *UserCase {
 	return &UserCase{
-		db: db,
+		db:           db,
+		jwtSecretKey: []byte(jwtSecret),
 	}
 }
-
-var jwtSecretKey = []byte("super-secret-key-change-me")
 
 func (u *UserCase) LoginUser(ctx context.Context, identifier, password string) (string, error) {
 	identifier = strings.ToLower(strings.TrimSpace(identifier))
@@ -42,7 +42,7 @@ func (u *UserCase) LoginUser(ctx context.Context, identifier, password string) (
 		"exp":     time.Now().Add(time.Hour * 72).Unix(),
 	})
 
-	tokenString, err := token.SignedString(jwtSecretKey)
+	tokenString, err := token.SignedString(u.jwtSecretKey)
 	if err != nil {
 		return "", err
 	}
