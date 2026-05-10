@@ -47,6 +47,9 @@ import (
 // @description API для приложения по управлению личными финансами.
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
 	// конфигурации
 	cnf := configs.LoadConfig()
