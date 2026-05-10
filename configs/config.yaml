@@ -7,6 +7,13 @@ http_server:
 logger:
    dir: "./logs"
 
+redis:
+   host: "localhost"
+   port: "6379"
+   password: ""
+   db: 0
+   ttl_seconds: 120
+
 postgress:
    host: "localhost"
    port: "5432"

@@ -11,6 +11,7 @@ type Config struct {
 	HttpServer HttpServer      `yaml:"http_server"`
 	Env        string          `yaml:"env" env-default:"local"`
 	Postgres   PostgressConfig `yaml:"postgres"`
+	Redis      RedisConfig     `yaml:"redis"`
 	Logger     LoggerConfig    `yaml:"logger"`
 	TypeDB     string          `yaml:"db_type" env:"TYPE_DB" env-default:"postgres"`
 	JWTSecret  string          `yaml:"jwt_secret" env:"JWT_SECRET" env-required:"true"`
@@ -30,6 +31,14 @@ type PostgressConfig struct {
 	DBName string `yaml:"db_name" env:"POSTGRESS_DB" env-default:"finance_db"`
 
 	Password string `env:"POSTGRES_PASSWORD" env-required:"true"`
+}
+
+type RedisConfig struct {
+	Host     string `yaml:"host" env:"REDIS_HOST" env-default:"localhost"`
+	Port     string `yaml:"port" env:"REDIS_PORT" env-default:"6379"`
+	Password string `yaml:"password" env:"REDIS_PASSWORD" env-default:""`
+	DB       int    `yaml:"db" env:"REDIS_DB" env-default:"0"`
+	TTL      int    `yaml:"ttl_seconds" env:"REDIS_TTL_SECONDS" env-default:"120"`
 }
 
 func LoadConfig() *Config {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"Finance-Manager-System/configs"
+	"Finance-Manager-System/internal/infrastructure/cache"
 	"Finance-Manager-System/internal/infrastructure/database"
 	"Finance-Manager-System/internal/infrastructure/logger"
 	authMiddleware "Finance-Manager-System/internal/infrastructure/middleware"
@@ -74,6 +75,12 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("db_connection_failed", zap.Error(err))
 	}
+	redisCache, redisErr := cache.NewRedisClient(cnf.Redis)
+	if redisErr != nil {
+		zap.L().Warn("redis_cache_disabled", zap.Error(redisErr))
+	} else if redisCache != nil && redisCache.Enabled() {
+		zap.L().Info("redis_cache_enabled")
+	}
 
 	txManager := database.NewTxManager(db)
 
@@ -122,6 +129,7 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(authMiddleware.RequireAuth)
+			r.Use(authMiddleware.CacheHTTPMiddleware(redisCache))
 			r.Mount("/accounts", accountRouter.Route())
 			r.Mount("/categories", categoryRouter.Route())
 			r.Mount("/transactions", transactionRouter.Route())
