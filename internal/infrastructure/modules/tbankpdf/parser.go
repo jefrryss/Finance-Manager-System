@@ -38,7 +38,9 @@ var (
 	reContractNumber = regexp.MustCompile(`Номер\s+договора:\s*([0-9]+)`)
 	reAccountNumber  = regexp.MustCompile(`Номер\s+лицевого\s+счета:\s*([0-9]+)`)
 	reBalance        = regexp.MustCompile(`Сумма\s+доступного\s+остатка\s+на\s+[0-9.]+:\s*([+\-]?[0-9\s]+[.,][0-9]{2})\s*₽`)
-	reTx             = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})\s+\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}\s+([+\-][0-9\s]+[.,][0-9]{2})\s*₽\s+[+\-][0-9\s]+[.,][0-9]{2}\s*₽\s+(.+?)\s+(—|\d{4})(?=\s+\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}\s+\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}\s+[+\-]|\s+АО\s+«ТБанк|\s+Пополнения:|$)`)
+	reDate           = regexp.MustCompile(`^\d{2}\.\d{2}\.\d{4}$`)
+	reTime           = regexp.MustCompile(`^\d{2}:\d{2}$`)
+	reCard           = regexp.MustCompile(`^(—|\d{4})$`)
 )
 
 func ParseStatement(data []byte) (*Statement, error) {
@@ -86,48 +88,8 @@ func ParseStatement(data []byte) (*Statement, error) {
 	}
 	statement.Balance = balance
 
-	matches := reTx.FindAllStringSubmatch(compact, -1)
-	if len(matches) == 0 {
-		return nil, ErrStatementNotSupported
-	}
-
-	loc := time.FixedZone("MSK", 3*60*60)
-	txs := make([]TransactionEntry, 0, len(matches))
-
-	for _, match := range matches {
-		if len(match) < 6 {
-			continue
-		}
-
-		dt, err := time.ParseInLocation("02.01.2006 15:04", strings.TrimSpace(match[1])+" "+strings.TrimSpace(match[2]), loc)
-		if err != nil {
-			continue
-		}
-
-		amount, err := parseMoneyToMinor(match[3])
-		if err != nil {
-			continue
-		}
-
-		isIncome := amount > 0
-		absAmount := amount
-		if absAmount < 0 {
-			absAmount = -absAmount
-		}
-
-		description := strings.TrimSpace(match[4])
-		card := strings.TrimSpace(match[5])
-
-		txs = append(txs, TransactionEntry{
-			CompletedAt: dt.UTC(),
-			Amount:      absAmount,
-			IsIncome:    isIncome,
-			Description: description,
-			CardNumber:  card,
-		})
-	}
-
-	if len(txs) == 0 {
+	txs, txErr := parseTransactions(text)
+	if txErr != nil || len(txs) == 0 {
 		return nil, ErrStatementNotSupported
 	}
 
@@ -149,4 +111,100 @@ func parseMoneyToMinor(input string) (int64, error) {
 		return 0, err
 	}
 	return int64(math.Round(value * 100)), nil
+}
+
+func parseTransactions(raw string) ([]TransactionEntry, error) {
+	lines := splitCleanLines(raw)
+	loc := time.FixedZone("MSK", 3*60*60)
+	transactions := make([]TransactionEntry, 0)
+
+	for i := 0; i < len(lines); i++ {
+		if i+5 >= len(lines) {
+			break
+		}
+
+		if !reDate.MatchString(lines[i]) || !reTime.MatchString(lines[i+1]) {
+			continue
+		}
+		if !reDate.MatchString(lines[i+2]) || !reTime.MatchString(lines[i+3]) {
+			continue
+		}
+
+		amount, err := parseMoneyToMinor(lines[i+4])
+		if err != nil {
+			continue
+		}
+		if _, err := parseMoneyToMinor(lines[i+5]); err != nil {
+			continue
+		}
+
+		j := i + 6
+		descParts := make([]string, 0, 2)
+		card := ""
+
+		for ; j < len(lines); j++ {
+			if reCard.MatchString(lines[j]) {
+				card = lines[j]
+				j++
+				break
+			}
+			if reDate.MatchString(lines[j]) && len(descParts) > 0 {
+				break
+			}
+			descParts = append(descParts, lines[j])
+		}
+
+		description := strings.TrimSpace(strings.Join(descParts, " "))
+		if description == "" {
+			i = j - 1
+			continue
+		}
+
+		dt, err := time.ParseInLocation("02.01.2006 15:04", lines[i]+" "+lines[i+1], loc)
+		if err != nil {
+			i = j - 1
+			continue
+		}
+
+		isIncome := amount > 0
+		absAmount := amount
+		if absAmount < 0 {
+			absAmount = -absAmount
+		}
+
+		transactions = append(transactions, TransactionEntry{
+			CompletedAt: dt.UTC(),
+			Amount:      absAmount,
+			IsIncome:    isIncome,
+			Description: description,
+			CardNumber:  card,
+		})
+
+		if j <= i {
+			i += 6
+		} else {
+			i = j - 1
+		}
+	}
+
+	if len(transactions) == 0 {
+		return nil, ErrStatementNotSupported
+	}
+	return transactions, nil
+}
+
+func splitCleanLines(raw string) []string {
+	raw = strings.ReplaceAll(raw, "\r\n", "\n")
+	raw = strings.ReplaceAll(raw, "\r", "\n")
+	raw = strings.ReplaceAll(raw, "\u00a0", " ")
+	parts := strings.Split(raw, "\n")
+	lines := make([]string, 0, len(parts))
+	for _, p := range parts {
+		s := strings.TrimSpace(reSpaces.ReplaceAllString(p, " "))
+		if s == "" {
+			continue
+		}
+		lines = append(lines, s)
+	}
+	return lines
 }
