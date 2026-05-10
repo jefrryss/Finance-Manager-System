@@ -4,6 +4,9 @@ http_server:
    port: "8080"
    adress: "0.0.0.0"
 
+logger:
+   dir: "./logs"
+
 postgress:
    host: "localhost"
    port: "5432"

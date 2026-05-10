@@ -63,7 +63,7 @@ import (
 // @name Authorization
 func main() {
 	cnf := configs.LoadConfig()
-	if err := logger.Init(cnf.Env); err != nil {
+	if err := logger.Init(cnf.Env, cnf.Logger.Dir); err != nil {
 		panic(err)
 	}
 	defer logger.Sync()
