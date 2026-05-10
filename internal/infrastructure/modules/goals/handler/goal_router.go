@@ -12,6 +12,7 @@ import (
 	"Finance-Manager-System/internal/infrastructure/middleware"
 	"Finance-Manager-System/internal/infrastructure/modules/goals/domain"
 	"Finance-Manager-System/internal/infrastructure/modules/goals/usecase"
+	transactionDomain "Finance-Manager-System/internal/infrastructure/modules/transactions/domain"
 )
 
 type GoalRouter struct {
@@ -246,6 +247,8 @@ func (h *GoalRouter) AddContribution(w http.ResponseWriter, r *http.Request) {
 func (h *GoalRouter) mapError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrGoalNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, transactionDomain.ErrTransNotFound):
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, domain.ErrGoalEmptyName),
 		errors.Is(err, domain.ErrGoalNameTooLong),

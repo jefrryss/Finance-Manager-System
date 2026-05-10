@@ -13,9 +13,11 @@ type BudgetRecommendation struct {
 	AverageShare      float64    `json:"average_share"`
 	RecommendedLimit  int64      `json:"recommended_limit"`
 	LastMonthExpense  int64      `json:"last_month_expense"`
+	LastMonthShare    float64    `json:"last_month_share"`
 	IsOverBudget      bool       `json:"is_over_budget"`
 	OverBudgetAmount  int64      `json:"over_budget_amount"`
 	OverBudgetPercent float64    `json:"over_budget_percent"`
+	IsExcessiveShare  bool       `json:"is_excessive_share"`
 }
 
 type MonthlyCategoryExpense struct {

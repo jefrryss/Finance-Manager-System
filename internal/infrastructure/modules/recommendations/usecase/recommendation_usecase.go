@@ -57,6 +57,7 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 		IconURL          *string
 		ShareSum         float64
 		LastMonthExpense int64
+		LastMonthShare   float64
 	}
 
 	monthTotals := make(map[string]int64)
@@ -98,6 +99,9 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 		for catKey, amount := range categoryByMonth[monthKey] {
 			meta := categoryMeta[catKey]
 			meta.ShareSum += float64(amount) / float64(total)
+			if monthKey == lastMonthStart.Format("2006-01") {
+				meta.LastMonthShare = float64(amount) / float64(total)
+			}
 			categoryMeta[catKey] = meta
 		}
 	}
@@ -123,6 +127,15 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 		if isOverBudget && recommendedLimit > 0 {
 			overBudgetPercent = (float64(overBudgetAmount) / float64(recommendedLimit)) * 100
 		}
+		isExcessiveShare := false
+		if stat.LastMonthShare > 0 {
+			if stat.LastMonthShare >= 0.35 {
+				isExcessiveShare = true
+			}
+			if averageShare > 0 && stat.LastMonthShare > averageShare*1.25 {
+				isExcessiveShare = true
+			}
+		}
 
 		recommendations = append(recommendations, domain.BudgetRecommendation{
 			CategoryID:        stat.CategoryID,
@@ -131,9 +144,11 @@ func (uc *RecommendationUseCase) GetBudgetRecommendations(
 			AverageShare:      averageShare,
 			RecommendedLimit:  recommendedLimit,
 			LastMonthExpense:  stat.LastMonthExpense,
+			LastMonthShare:    stat.LastMonthShare,
 			IsOverBudget:      isOverBudget,
 			OverBudgetAmount:  maxInt64(overBudgetAmount, 0),
 			OverBudgetPercent: overBudgetPercent,
+			IsExcessiveShare:  isExcessiveShare,
 		})
 	}
 

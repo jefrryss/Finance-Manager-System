@@ -3,12 +3,14 @@ package usecase
 import (
 	"context"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
 
 	"Finance-Manager-System/internal/infrastructure/database"
 	"Finance-Manager-System/internal/infrastructure/modules/goals/domain"
+	transactionDomain "Finance-Manager-System/internal/infrastructure/modules/transactions/domain"
 )
 
 type GoalRepository interface {
@@ -25,11 +27,16 @@ type GoalRepository interface {
 
 type GoalUseCase struct {
 	repo      GoalRepository
+	transRepo GoalTransactionRepository
 	txManager database.TxManager
 }
 
-func NewGoalUseCase(repo GoalRepository, txManager database.TxManager) *GoalUseCase {
-	return &GoalUseCase{repo: repo, txManager: txManager}
+type GoalTransactionRepository interface {
+	GetTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) (*transactionDomain.Transaction, error)
+}
+
+func NewGoalUseCase(repo GoalRepository, transRepo GoalTransactionRepository, txManager database.TxManager) *GoalUseCase {
+	return &GoalUseCase{repo: repo, transRepo: transRepo, txManager: txManager}
 }
 
 func (uc *GoalUseCase) CreateGoal(ctx context.Context, userID uuid.UUID, name string, targetAmount int64, targetDate *time.Time) (uuid.UUID, error) {
@@ -70,10 +77,41 @@ func (uc *GoalUseCase) GetGoalDetails(ctx context.Context, userID uuid.UUID, goa
 		return nil, err
 	}
 
+	excessAmount := int64(0)
+	redirectSuggestions := make([]domain.GoalRedirectSuggestion, 0)
+	if goal.CurrentAmount > goal.TargetAmount {
+		excessAmount = goal.CurrentAmount - goal.TargetAmount
+		goals, goalsErr := uc.repo.GetGoalsByUser(ctx, userID)
+		if goalsErr != nil {
+			return nil, goalsErr
+		}
+
+		for _, candidate := range goals {
+			if candidate.GoalID == goal.GoalID {
+				continue
+			}
+			if candidate.CurrentAmount >= candidate.TargetAmount {
+				continue
+			}
+			needed := candidate.TargetAmount - candidate.CurrentAmount
+			redirectSuggestions = append(redirectSuggestions, domain.GoalRedirectSuggestion{
+				GoalID:       candidate.GoalID,
+				NameGoal:     candidate.NameGoal,
+				NeededAmount: needed,
+			})
+		}
+
+		sort.Slice(redirectSuggestions, func(i, j int) bool {
+			return redirectSuggestions[i].NeededAmount < redirectSuggestions[j].NeededAmount
+		})
+	}
+
 	return &domain.GoalDetails{
-		Summary:       buildSummary(*goal, time.Now().UTC()),
-		Contributions: contributions,
-		Forecast:      forecast,
+		Summary:             buildSummary(*goal, time.Now().UTC()),
+		Contributions:       contributions,
+		Forecast:            forecast,
+		ExcessAmount:        excessAmount,
+		RedirectSuggestions: redirectSuggestions,
 	}, nil
 }
 
@@ -103,6 +141,23 @@ func (uc *GoalUseCase) DeleteGoal(ctx context.Context, userID uuid.UUID, goalID 
 func (uc *GoalUseCase) AddContribution(ctx context.Context, userID uuid.UUID, goalID uuid.UUID, amount int64, contributionDate *time.Time, transactionID *uuid.UUID) (uuid.UUID, error) {
 	if _, err := uc.repo.GetGoalByID(ctx, userID, goalID); err != nil {
 		return uuid.Nil, err
+	}
+
+	if transactionID != nil {
+		if uc.transRepo == nil {
+			return uuid.Nil, domain.ErrGoalNotFound
+		}
+		trans, err := uc.transRepo.GetTransaction(ctx, userID, *transactionID)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		if amount <= 0 {
+			amount = trans.Amount
+		}
+		if contributionDate == nil {
+			dt := trans.CompletedAt
+			contributionDate = &dt
+		}
 	}
 
 	contribution, err := domain.NewGoalContribution(userID, goalID, amount, contributionDate, transactionID)

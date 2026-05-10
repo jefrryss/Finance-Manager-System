@@ -102,8 +102,14 @@ definitions:
         items:
           $ref: '#/definitions/domain.GoalContribution'
         type: array
+      excess_amount:
+        type: integer
       forecast:
         $ref: '#/definitions/domain.GoalForecast'
+      redirect_suggestions:
+        items:
+          $ref: '#/definitions/domain.GoalRedirectSuggestion'
+        type: array
       summary:
         $ref: '#/definitions/domain.GoalSummary'
     type: object
@@ -114,6 +120,15 @@ definitions:
       estimated_reach_date:
         type: string
       remaining_months:
+        type: integer
+    type: object
+  domain.GoalRedirectSuggestion:
+    properties:
+      goal_id:
+        type: string
+      name_goal:
+        type: string
+      needed_amount:
         type: integer
     type: object
   domain.GoalStatus:
