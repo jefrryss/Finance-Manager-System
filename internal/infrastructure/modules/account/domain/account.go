@@ -41,6 +41,7 @@ func NewAccount(
 	colorHex string,
 	isImported bool,
 	externalAccountID *string,
+	initialBalance int64,
 ) (*Account, error) {
 
 	if userID == uuid.Nil {
@@ -85,7 +86,7 @@ func NewAccount(
 	return &Account{
 		AccountID:         uuid.Nil,
 		UserID:            userID,
-		Balance:           0,
+		Balance:           initialBalance,
 		IsImported:        isImported,
 		ExternalAccountID: externalAccountID,
 		AccountType:       accountType,

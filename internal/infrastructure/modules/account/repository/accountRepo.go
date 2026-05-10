@@ -21,6 +21,9 @@ func NewAccountRepo(db *sqlx.DB) *AccountRepo {
 
 func (r *AccountRepo) UpdateBalance(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, amountDelta int64) error {
 	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return err
+	}
 	query := `UPDATE Accounts SET balance = balance + $1 WHERE user_id = $2 AND account_id = $3 AND is_archived = false`
 
 	result, err := q.ExecContext(ctx, query, amountDelta, userID, accountID)
@@ -38,6 +41,9 @@ func (r *AccountRepo) UpdateBalance(ctx context.Context, userID uuid.UUID, accou
 
 func (r *AccountRepo) GetAllAccountsByUser(ctx context.Context, userID uuid.UUID) ([]domain.Account, error) {
 	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return nil, err
+	}
 	accounts := make([]domain.Account, 0)
 
 	query := `
@@ -54,17 +60,60 @@ func (r *AccountRepo) GetAllAccountsByUser(ctx context.Context, userID uuid.UUID
 	return accounts, nil
 }
 
-func (r *AccountRepo) ChangeNameAccount(ctx context.Context, name string, userID uuid.UUID, accountID uuid.UUID) error {
+func (r *AccountRepo) GetAccountByID(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) (*domain.Account, error) {
 	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return nil, err
+	}
+	var account domain.Account
 	query := `
-        UPDATE Accounts 
-        SET name_account = $1 
-        WHERE user_id = $2 AND account_id = $3 AND is_archived = false
+        SELECT * FROM Accounts
+        WHERE user_id = $1 AND account_id = $2 AND is_archived = false
     `
+	if err := q.GetContext(ctx, &account, query, userID, accountID); err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+	return &account, nil
+}
 
+func (r *AccountRepo) UpdateAccountName(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, name string) error {
+	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return err
+	}
+	query := `
+		UPDATE Accounts
+		SET name_account = $1
+		WHERE user_id = $2 AND account_id = $3 AND is_archived = false
+	`
 	result, err := q.ExecContext(ctx, query, name, userID, accountID)
 	if err != nil {
-		return fmt.Errorf("failed to change account name: %w", err)
+		return fmt.Errorf("failed to update account name: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check affected rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("account not found or archived")
+	}
+	return nil
+}
+
+func (r *AccountRepo) UpdateManualAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, name string, balance int64) error {
+	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return err
+	}
+	query := `
+        UPDATE Accounts 
+        SET name_account = $1, balance = $2
+        WHERE user_id = $3 AND account_id = $4 AND is_archived = false AND is_imported = false
+    `
+
+	result, err := q.ExecContext(ctx, query, name, balance, userID, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to update manual account: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
@@ -73,9 +122,33 @@ func (r *AccountRepo) ChangeNameAccount(ctx context.Context, name string, userID
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("account not found or archived")
+		return fmt.Errorf("manual account not found or archived")
 	}
 
+	return nil
+}
+
+func (r *AccountRepo) UpdateImportedAccountSnapshot(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, balance int64) error {
+	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return err
+	}
+	query := `
+		UPDATE Accounts
+		SET balance = $1, last_synced_at = CURRENT_TIMESTAMP
+		WHERE user_id = $2 AND account_id = $3 AND is_archived = false AND is_imported = true
+	`
+	result, err := q.ExecContext(ctx, query, balance, userID, accountID)
+	if err != nil {
+		return fmt.Errorf("failed to update imported account: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check affected rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("imported account not found or archived")
+	}
 	return nil
 }
 
@@ -137,6 +210,9 @@ func (r *AccountRepo) ensureAccountsSchema(ctx context.Context, q database.Query
 
 func (r *AccountRepo) ArchiveAccount(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) error {
 	q := database.GetQueryer(ctx, r.db)
+	if err := r.ensureAccountsSchema(ctx, q); err != nil {
+		return err
+	}
 	query := `
         UPDATE Accounts 
         SET is_archived = true

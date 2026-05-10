@@ -18,26 +18,36 @@ var (
 )
 
 type Transaction struct {
-	TransactionID   uuid.UUID  `db:"transaction_id" json:"transaction_id"`
-	UserID          uuid.UUID  `db:"user_id" json:"user_id"`
-	AccountID       uuid.UUID  `db:"account_id" json:"account_id"`
-	CategoryID      *uuid.UUID `db:"category_id" json:"category_id"`
-	NameTransaction string     `db:"name_transaction" json:"name_transaction"`
-	IsIncome        bool       `db:"is_income" json:"is_income"`
-	Amount          int64      `db:"amount" json:"amount"`
-	CompletedAt     time.Time  `db:"completed_at" json:"completed_at"`
-	IsHidden        bool       `db:"is_hidden" json:"is_hidden"`
-	IsImported      bool       `db:"is_imported" json:"is_imported"`
-	Comment         *string    `db:"comment" json:"comment,omitempty"`
+	TransactionID         uuid.UUID  `db:"transaction_id" json:"transaction_id"`
+	UserID                uuid.UUID  `db:"user_id" json:"user_id"`
+	AccountID             uuid.UUID  `db:"account_id" json:"account_id"`
+	CategoryID            *uuid.UUID `db:"category_id" json:"category_id"`
+	NameTransaction       string     `db:"name_transaction" json:"name_transaction"`
+	IsIncome              bool       `db:"is_income" json:"is_income"`
+	Amount                int64      `db:"amount" json:"amount"`
+	CompletedAt           time.Time  `db:"completed_at" json:"completed_at"`
+	IsHidden              bool       `db:"is_hidden" json:"is_hidden"`
+	IsImported            bool       `db:"is_imported" json:"is_imported"`
+	Comment               *string    `db:"comment" json:"comment,omitempty"`
+	SenderAccount         *string    `db:"sender_account" json:"sender_account,omitempty"`
+	ReceiverAccount       *string    `db:"receiver_account" json:"receiver_account,omitempty"`
+	Currency              string     `db:"currency" json:"currency"`
+	BankFee               int64      `db:"bank_fee" json:"bank_fee"`
+	Status                string     `db:"status" json:"status"`
+	ExternalTransactionID *string    `db:"external_transaction_id" json:"external_transaction_id,omitempty"`
+	MCCCode               *string    `db:"mcc_code" json:"mcc_code,omitempty"`
 }
 
 type TransactionFilter struct {
-	AccountID  *uuid.UUID
-	CategoryID *uuid.UUID
-	IsIncome   *bool
-	StartDate  *time.Time
-	EndDate    *time.Time
-	IsHidden   *bool
+	AccountID      *uuid.UUID
+	CategoryID     *uuid.UUID
+	IsIncome       *bool
+	StartDate      *time.Time
+	EndDate        *time.Time
+	IsHidden       *bool
+	AccountIDs     []uuid.UUID
+	IncludeHidden  bool
+	HasIsHiddenSet bool
 }
 
 func NewTransaction(
@@ -82,16 +92,21 @@ func NewTransaction(
 	}
 
 	return &Transaction{
-		TransactionID:   uuid.Nil,
-		UserID:          userID,
-		AccountID:       accountID,
-		CategoryID:      categoryID,
-		NameTransaction: name,
-		IsIncome:        isIncome,
-		Amount:          amount,
-		CompletedAt:     completedAt,
-		IsHidden:        false,
-		IsImported:      isImported,
-		Comment:         comment,
+		TransactionID:         uuid.Nil,
+		UserID:                userID,
+		AccountID:             accountID,
+		CategoryID:            categoryID,
+		NameTransaction:       name,
+		IsIncome:              isIncome,
+		Amount:                amount,
+		CompletedAt:           completedAt,
+		IsHidden:              false,
+		IsImported:            isImported,
+		Comment:               comment,
+		Currency:              "RUB",
+		BankFee:               0,
+		Status:                "completed",
+		ExternalTransactionID: nil,
+		MCCCode:               nil,
 	}, nil
 }
