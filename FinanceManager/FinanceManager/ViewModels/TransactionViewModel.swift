@@ -4,12 +4,17 @@ import Observation
 @Observable
 class TransactionViewModel {
     var transactions: [Transaction] = []
+    var categories: [String: TransactionCategory] = [:]
     var isLoading = false
     var errorMessage: String?
     
     var searchText = ""
     var selectedFilterType: TransactionFilterType = .all
     var selectedAccountId: String?
+    var selectedCategoryId: String?
+    
+    var dateInputText = ""
+    var categorySearchText = ""
     
     enum TransactionFilterType {
         case all
@@ -29,11 +34,17 @@ class TransactionViewModel {
             grouped[dateKey]?.append(transaction)
         }
         
-        return grouped.sorted { $0.key > $1.key }.map { (date: $0.key, transactions: $0.value) }
+        return grouped.map { (date: $0.key, transactions: $0.value) }
+            .sorted { group1, group2 in
+                let date1 = group1.transactions.first?.completedAt ?? Date.distantPast
+                let date2 = group2.transactions.first?.completedAt ?? Date.distantPast
+                return date1 > date2
+            }
     }
     
     var filteredTransactions: [Transaction] {
         var result = transactions
+        let calendar = Calendar.current
         
         switch selectedFilterType {
         case .income:
@@ -44,15 +55,33 @@ class TransactionViewModel {
             break
         }
         
-        if let accountId = selectedAccountId {
-            result = result.filter { $0.accountId == accountId }
+        if !dateInputText.isEmpty {
+            result = result.filter { tx in
+                let monthName = tx.completedAt.formatted(.dateTime.month(.wide)).lowercased()
+                let yearString = String(calendar.component(.year, from: tx.completedAt))
+                let input = dateInputText.lowercased()
+                return monthName.contains(input) || yearString.contains(input)
+            }
+        }
+        
+        if let categoryId = selectedCategoryId {
+            result = result.filter { $0.categoryId == categoryId }
         }
         
         if !searchText.isEmpty {
             result = result.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
         
-        return result.sorted { $0.completedAt > $1.completedAt }
+        return result
+    }
+    
+    var searchedCategories: [TransactionCategory] {
+        let allCats = Array(categories.values)
+        if categorySearchText.isEmpty {
+            return allCats.sorted { $0.nameCategory < $1.nameCategory }
+        }
+        return allCats.filter { $0.nameCategory.localizedCaseInsensitiveContains(categorySearchText) }
+            .sorted { $0.nameCategory < $1.nameCategory }
     }
     
     var statistics: (income: Double, expense: Double) {
@@ -66,33 +95,30 @@ class TransactionViewModel {
         isLoading = true
         errorMessage = nil
         do {
-            let activeAccounts: [Account] = try await NetworkManager.shared.fetch(endpoint: "/accounts")
-            let activeAccountIds = Set(activeAccounts.map { $0.accountId })
+            async let fetchedAccounts: [Account] = try NetworkManager.shared.fetch(endpoint: "/accounts")
+            async let fetchedCategories: [TransactionCategory] = try NetworkManager.shared.fetch(endpoint: "/categories")
+            async let fetchedTransactions: [Transaction] = try NetworkManager.shared.fetch(endpoint: "/transactions")
             
-            let allTransactions: [Transaction] = try await NetworkManager.shared.fetch(endpoint: "/transactions")
+            let (accs, cats, txs) = try await (fetchedAccounts, fetchedCategories, fetchedTransactions)
+            let activeAccountIds = Set(accs.map { $0.accountId })
             
-            self.transactions = allTransactions.filter { activeAccountIds.contains($0.accountId) }
-            
-            print("✅ Транзакции загружены: \(self.transactions.count)")
+            self.categories = Dictionary(uniqueKeysWithValues: cats.map { ($0.categoryId, $0) })
+            self.transactions = txs.filter { activeAccountIds.contains($0.accountId) }
         } catch {
             self.errorMessage = error.localizedDescription
-            print("❌ Ошибка загрузки транзакций: \(error)")
         }
         isLoading = false
     }
     
-    func fetchTransactionsForAccount(_ accountId: String) async {
-        isLoading = true
-        errorMessage = nil
+    func updateCategory(for transaction: Transaction, newCategoryId: String) async -> Bool {
+        let body = ["category_id": newCategoryId]
         do {
-            let allTransactions: [Transaction] = try await NetworkManager.shared.fetch(endpoint: "/transactions")
-            self.transactions = allTransactions.filter { $0.accountId == accountId }
-            print("✅ Транзакции счета \(accountId) загружены: \(self.transactions.count)")
+            let _: [String: String] = try await NetworkManager.shared.post(endpoint: "/transactions/\(transaction.transactionId)", body: body)
+            await fetchTransactions()
+            return true
         } catch {
-            self.errorMessage = error.localizedDescription
-            print("❌ Ошибка загрузки транзакций счета: \(error)")
+            return false
         }
-        isLoading = false
     }
     
     private func dateGroupKey(_ date: Date) -> String {

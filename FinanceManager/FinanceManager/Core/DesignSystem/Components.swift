@@ -15,7 +15,7 @@ struct FintechTextField: View {
             ZStack(alignment: .leading) {
                 if text.isEmpty {
                     Text(placeholder)
-                        .foregroundColor(AppTheme.textSecondary)
+                        .foregroundColor(Color.white.opacity(0.75))
                 }
                 
                 if isSecure {

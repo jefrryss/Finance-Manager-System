@@ -19,30 +19,33 @@ class AddTransactionViewModel {
     var errorMessage: String?
     
     func fetchFormOptions() async {
-        do {
-            async let fetchedAccounts: [Account] = try NetworkManager.shared.fetch(endpoint: "/accounts")
-            async let fetchedCategories: [TransactionCategory] = try NetworkManager.shared.fetch(endpoint: "/categories")
-            
-            let (accs, cats) = try await (fetchedAccounts, fetchedCategories)
-            
-            await MainActor.run {
-                self.accounts = accs
-                self.categories = cats
+            do {
+                async let fetchedAccounts: [Account] = try NetworkManager.shared.fetch(endpoint: "/accounts")
+                async let fetchedCategories: [TransactionCategory] = try NetworkManager.shared.fetch(endpoint: "/categories")
                 
-                if let firstAcc = accs.first { self.selectedAccountId = firstAcc.accountId }
+                let (accs, cats) = try await (fetchedAccounts, fetchedCategories)
                 
-                if cats.isEmpty {
-                    self.isCustomCategory = true
-                } else {
-                    updateCategorySelection()
+                await MainActor.run {
+                    self.accounts = accs
+                    self.categories = cats
+                    
+                    if let firstAcc = accs.first { self.selectedAccountId = firstAcc.accountId }
+                    
+                    if cats.isEmpty {
+                        print("⚠️ Сервер вернул пустой список категорий")
+                        self.isCustomCategory = true
+                    } else {
+                        print("✅ Категории успешно загружены: \(cats.count)")
+                        updateCategorySelection()
+                    }
+                }
+            } catch {
+                print("❌ Ошибка загрузки счетов/категорий: \(error)")
+                await MainActor.run {
+                    self.errorMessage = "Ошибка загрузки данных"
                 }
             }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = "Ошибка загрузки данных"
-            }
         }
-    }
     
     func updateCategorySelection() {
         let filteredCats = categories.filter { $0.isIncome == isIncome }

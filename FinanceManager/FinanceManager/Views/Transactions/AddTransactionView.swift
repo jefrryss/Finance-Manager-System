@@ -4,7 +4,14 @@ struct AddTransactionView: View {
     @Environment(\.dismiss) var dismiss
     @State private var viewModel = AddTransactionViewModel()
     var onSave: () -> Void
-    
+
+    init(initialIsIncome: Bool = false, onSave: @escaping () -> Void) {
+        let model = AddTransactionViewModel()
+        model.isIncome = initialIsIncome
+        self._viewModel = State(initialValue: model)
+        self.onSave = onSave
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {

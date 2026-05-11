@@ -90,6 +90,33 @@ class NetworkManager {
         return try decoder.decode(U.self, from: data)
     }
     
+    func put<T: Codable, U: Codable>(endpoint: String, body: T) async throws -> U {
+        guard let url = URL(string: baseURL + endpoint) else { throw URLError(.badURL) }
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = currentUserId {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        request.httpBody = try encoder.encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8) ?? "<non-text response>"
+            throw NetworkError.badResponse(statusCode: httpResponse.statusCode, body: bodyString)
+        }
+        
+        return try decoder.decode(U.self, from: data)
+    }
+    
     func delete(endpoint: String) async throws {
         guard let url = URL(string: baseURL + endpoint) else { throw URLError(.badURL) }
         var request = URLRequest(url: url)

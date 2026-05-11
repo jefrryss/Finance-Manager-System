@@ -53,7 +53,7 @@ struct AccountDetailView: View {
                             let recentTxs = Array(txViewModel.filteredTransactions.prefix(5))
                             
                             ForEach(recentTxs) { transaction in
-                                TransactionRow(transaction: transaction)
+                                TransactionRow(transaction: transaction, category: txViewModel.categories[transaction.categoryId ?? ""])
                                     .padding(.vertical, 4)
                             }
                             
@@ -110,7 +110,7 @@ struct AccountDetailView: View {
         }
         .task {
             txViewModel.selectedAccountId = account.accountId
-            await txViewModel.fetchTransactionsForAccount(account.accountId)
+            await txViewModel.fetchTransactions()
         }
     }
 }

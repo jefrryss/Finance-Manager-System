@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TransactionRow: View {
     let transaction: Transaction
+    let category: TransactionCategory?
     
     var body: some View {
         HStack(spacing: 16) {
@@ -19,10 +20,19 @@ struct TransactionRow: View {
                 Text(transaction.name)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
+                    .lineLimit(1)
                 
-                Text(transaction.completedAt.formatted(date: .abbreviated, time: .omitted))
-                    .font(.system(size: 13))
-                    .foregroundColor(AppTheme.textSecondary)
+                HStack(spacing: 6) {
+                    Text(transaction.completedAt.formatted(date: .abbreviated, time: .omitted))
+                    
+                    if let catName = category?.nameCategory {
+                        Text("•")
+                        Text(catName)
+                            .lineLimit(1)
+                    }
+                }
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary)
             }
             
             Spacer()
@@ -30,6 +40,7 @@ struct TransactionRow: View {
             Text("\(transaction.isIncome ? "+" : "-")\(Double(transaction.amount) / 100.0, specifier: "%.2f") ₽")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundColor(transaction.isIncome ? AppTheme.accent : AppTheme.textPrimary)
+                .layoutPriority(1)
         }
         .padding(.vertical, 8)
     }

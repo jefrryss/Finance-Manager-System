@@ -30,10 +30,8 @@ struct ProfileView: View {
                         .padding(.top, 20)
                         
                         VStack(spacing: 1) {
-                            ProfileRow(icon: "lock.fill", title: "Сменить пароль", color: .blue) {
-                            }
-                            
-                            ProfileRow(icon: "at", title: "Сменить логин", color: .purple) {
+                            NavigationLink(destination: PasswordChangeView(viewModel: viewModel)) {
+                                ProfileRow(icon: "lock.fill", title: "Сменить пароль", color: .blue)
                             }
                         }
                         .background(AppTheme.bgSecondary.opacity(0.5))
@@ -47,7 +45,7 @@ struct ProfileView: View {
                                 .padding(.horizontal, 40)
                             
                             VStack(spacing: 1) {
-                                NavigationLink(destination: Text("Экран категорий")) {
+                                NavigationLink(destination: CategoriesView()) {
                                     ProfileRow(icon: "tag.fill", title: "Мои категории", color: AppTheme.accent)
                                 }
                             }
@@ -97,30 +95,37 @@ struct ProfileRow: View {
     let color: Color
     var action: (() -> Void)? = nil
     
-    var body: some View {
-        Button {
-            action?()
-        } label: {
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(color.opacity(0.2))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(color)
-                }
-                
-                Text(title)
-                    .foregroundColor(AppTheme.textPrimary)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
+    @ViewBuilder
+    private var rowContent: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.2))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary.opacity(0.5))
+                    .foregroundColor(color)
             }
-            .padding()
+            
+            Text(title)
+                .foregroundColor(AppTheme.textPrimary)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary.opacity(0.5))
+        }
+        .padding()
+    }
+    
+    var body: some View {
+        if let action {
+            Button(action: action) {
+                rowContent
+            }
+        } else {
+            rowContent
         }
     }
 }

@@ -31,6 +31,7 @@ type AccountCategoryRepository interface {
 
 type AccountTransactionRepository interface {
 	AddTransactions(ctx context.Context, transactions []*transactionDomain.Transaction) (int, error)
+	ResolveAutoCategoryID(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string) (*uuid.UUID, error)
 }
 
 type AccountUseCase struct {
@@ -116,7 +117,13 @@ func (uc *AccountUseCase) ImportAccountFromTBankPDF(ctx context.Context, userID 
 		trans := make([]*transactionDomain.Transaction, 0, len(statement.Transactions))
 		skippedCount := 0
 		for _, rawTx := range statement.Transactions {
-			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
+			categoryID, ruleErr := uc.transRepo.ResolveAutoCategoryID(txCtx, userID, rawTx.IsIncome, rawTx.MCCCode, rawTx.Description)
+			if ruleErr != nil {
+				return fmt.Errorf("failed to resolve auto category: %w", ruleErr)
+			}
+			if categoryID == nil {
+				categoryID = resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
+			}
 			tx, txErr := transactionDomain.NewTransaction(
 				userID,
 				accountID,
@@ -300,7 +307,13 @@ func (uc *AccountUseCase) SyncImportedAccountFromTBankPDF(ctx context.Context, u
 				skippedCount++
 				continue
 			}
-			categoryID := resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
+			categoryID, ruleErr := uc.transRepo.ResolveAutoCategoryID(txCtx, userID, rawTx.IsIncome, rawTx.MCCCode, rawTx.Description)
+			if ruleErr != nil {
+				return fmt.Errorf("failed to resolve auto category: %w", ruleErr)
+			}
+			if categoryID == nil {
+				categoryID = resolveCategoryID(categories, rawTx.Description, rawTx.IsIncome, rawTx.MCCCode)
+			}
 			tx, txErr := transactionDomain.NewTransaction(
 				userID,
 				accountID,

@@ -18,10 +18,14 @@ class ProfileViewModel {
         defer { isLoading = false }
         
         do {
-            let _: [String: String] = try await NetworkManager.shared.post(endpoint: "/users/change_password", body: ["password": newPassword])
+            let _: [String: String] = try await NetworkManager.shared.put(endpoint: "/users/change_password", body: ["password": newPassword])
+            print("✅ Пароль успешно изменён")
+            self.errorMessage = nil
             return true
         } catch {
-            self.errorMessage = "Не удалось сменить пароль"
+            print("❌ Ошибка смены пароля: \(error)")
+            print("Описание: \(error.localizedDescription)")
+            self.errorMessage = error.localizedDescription.isEmpty ? "Не удалось сменить пароль" : error.localizedDescription
             return false
         }
     }

@@ -4,6 +4,7 @@ struct HomeView: View {
     @State private var viewModel = AccountViewModel()
     @State private var txViewModel = TransactionViewModel()
     @State private var showingAddTransaction = false
+    @State private var isCreatingIncome = false
     @State private var showingAddAccount = false
     
     var body: some View {
@@ -28,9 +29,11 @@ struct HomeView: View {
                         
                         HStack(spacing: 20) {
                             QuickActionButton(title: "Трата", icon: "minus.circle.fill", color: .red) {
+                                isCreatingIncome = false
                                 showingAddTransaction = true
                             }
                             QuickActionButton(title: "Доход", icon: "plus.circle.fill", color: AppTheme.accent) {
+                                isCreatingIncome = true
                                 showingAddTransaction = true
                             }
                             QuickActionButton(title: "Лимиты", icon: "gauge.with.needle.fill", color: .blue) {
@@ -109,7 +112,7 @@ struct HomeView: View {
                 })
             }
             .sheet(isPresented: $showingAddTransaction) {
-                AddTransactionView {
+                AddTransactionView(initialIsIncome: isCreatingIncome) {
                     Task {
                         await viewModel.fetchAccounts()
                         await txViewModel.fetchTransactions()

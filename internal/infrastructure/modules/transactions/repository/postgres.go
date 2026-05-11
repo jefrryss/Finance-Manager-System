@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -207,7 +208,7 @@ func (tr *TransRepository) GetAllTransactions(ctx context.Context, userID uuid.U
 	query := `
         SELECT * FROM Transactions 
         WHERE user_id = $1 
-        ORDER BY completed_at DESC
+        ORDER BY completed_at DESC, transaction_id DESC
     `
 
 	err := q.SelectContext(ctx, &transactions, query, userID)
@@ -270,7 +271,7 @@ func (tr *TransRepository) GetTransactionsWithFilter(ctx context.Context, userID
 		query += ` AND account_id IN (` + strings.Join(placeholders, ", ") + `)`
 	}
 
-	query += ` ORDER BY completed_at DESC`
+	query += ` ORDER BY completed_at DESC, transaction_id DESC`
 
 	err := q.SelectContext(ctx, &transactions, query, args...)
 	if err != nil {
@@ -306,6 +307,106 @@ func (tr *TransRepository) GetTransactionsByIDs(ctx context.Context, userID uuid
 	return transactions, nil
 }
 
+func (tr *TransRepository) ResolveAutoCategoryID(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string) (*uuid.UUID, error) {
+	q := database.GetQueryer(ctx, tr.db)
+	if err := tr.ensureTransactionsSchema(ctx, q); err != nil {
+		return nil, err
+	}
+
+	merchantKey := normalizeRuleKey(description)
+	if mccCode != nil {
+		var categoryID uuid.UUID
+		err := q.GetContext(
+			ctx,
+			&categoryID,
+			`SELECT category_id
+			 FROM AutoCategoryRules
+			 WHERE user_id = $1 AND is_income = $2 AND mcc_code = $3
+			 ORDER BY updated_at DESC
+			 LIMIT 1`,
+			userID,
+			isIncome,
+			strings.TrimSpace(*mccCode),
+		)
+		if err == nil {
+			return &categoryID, nil
+		}
+	}
+
+	if merchantKey == "" {
+		return nil, nil
+	}
+
+	var categoryID uuid.UUID
+	err := q.GetContext(
+		ctx,
+		&categoryID,
+		`SELECT category_id
+		 FROM AutoCategoryRules
+		 WHERE user_id = $1 AND is_income = $2 AND merchant_key = $3
+		 ORDER BY updated_at DESC
+		 LIMIT 1`,
+		userID,
+		isIncome,
+		merchantKey,
+	)
+	if err != nil {
+		return nil, nil
+	}
+	return &categoryID, nil
+}
+
+func (tr *TransRepository) UpsertAutoCategoryRule(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string, categoryID uuid.UUID) error {
+	q := database.GetQueryer(ctx, tr.db)
+	if err := tr.ensureTransactionsSchema(ctx, q); err != nil {
+		return err
+	}
+	merchantKey := normalizeRuleKey(description)
+	normalizedMCC := ""
+	if mccCode != nil {
+		normalizedMCC = strings.TrimSpace(*mccCode)
+	}
+
+	if normalizedMCC == "" && merchantKey == "" {
+		return nil
+	}
+
+	if normalizedMCC != "" {
+		if _, err := q.ExecContext(
+			ctx,
+			`INSERT INTO AutoCategoryRules (user_id, is_income, mcc_code, merchant_key, category_id, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			 ON CONFLICT (user_id, is_income, mcc_code)
+			 DO UPDATE SET category_id = EXCLUDED.category_id, merchant_key = EXCLUDED.merchant_key, updated_at = CURRENT_TIMESTAMP`,
+			userID,
+			isIncome,
+			normalizedMCC,
+			merchantKey,
+			categoryID,
+		); err != nil {
+			return fmt.Errorf("failed to upsert mcc auto-category rule: %w", err)
+		}
+	}
+
+	if merchantKey != "" {
+		if _, err := q.ExecContext(
+			ctx,
+			`INSERT INTO AutoCategoryRules (user_id, is_income, mcc_code, merchant_key, category_id, created_at, updated_at)
+			 VALUES ($1, $2, NULL, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			 ON CONFLICT (user_id, is_income, merchant_key)
+			 DO UPDATE SET category_id = EXCLUDED.category_id, updated_at = CURRENT_TIMESTAMP`,
+			userID,
+			isIncome,
+			merchantKey,
+			categoryID,
+		); err != nil {
+			return fmt.Errorf("failed to upsert merchant auto-category rule: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (tr *TransRepository) ensureTransactionsSchema(ctx context.Context, q database.Queryer) error {
 	queries := []string{
 		`ALTER TABLE Transactions ADD COLUMN IF NOT EXISTS sender_account TEXT`,
@@ -316,6 +417,20 @@ func (tr *TransRepository) ensureTransactionsSchema(ctx context.Context, q datab
 		`ALTER TABLE Transactions ADD COLUMN IF NOT EXISTS external_transaction_id TEXT`,
 		`ALTER TABLE Transactions ADD COLUMN IF NOT EXISTS mcc_code VARCHAR(4)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_external_uid ON Transactions(user_id, account_id, external_transaction_id) WHERE external_transaction_id IS NOT NULL`,
+		`CREATE TABLE IF NOT EXISTS AutoCategoryRules (
+			rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL,
+			is_income BOOLEAN NOT NULL,
+			mcc_code VARCHAR(4),
+			merchant_key TEXT NOT NULL DEFAULT '',
+			category_id UUID NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			CONSTRAINT fk_user_auto_category_rule FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+			CONSTRAINT fk_category_auto_category_rule FOREIGN KEY (category_id) REFERENCES Category(category_id) ON DELETE CASCADE
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_auto_category_rule_mcc ON AutoCategoryRules (user_id, is_income, mcc_code) WHERE mcc_code IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_auto_category_rule_merchant ON AutoCategoryRules (user_id, is_income, merchant_key) WHERE merchant_key <> ''`,
 	}
 	for _, query := range queries {
 		if _, err := q.ExecContext(ctx, query); err != nil {
@@ -323,4 +438,15 @@ func (tr *TransRepository) ensureTransactionsSchema(ctx context.Context, q datab
 		}
 	}
 	return nil
+}
+
+func normalizeRuleKey(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '.' || r == '*' {
+			b.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
 }

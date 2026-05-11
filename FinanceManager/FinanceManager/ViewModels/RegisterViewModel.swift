@@ -23,8 +23,13 @@ class RegisterViewModel {
         
         let req = RegisterReq(email: email, login: login, password: password)
         do {
-            let res: RegisterRes = try await NetworkManager.shared.post(endpoint: "/users/register", body: req)
-            NetworkManager.shared.currentUserId = res.id
+            let _: RegisterRes = try await NetworkManager.shared.post(endpoint: "/users/register", body: req)
+            
+            let loginReq = LoginRequest(identifier: login, password: password)
+            let loginRes: LoginResponse = try await NetworkManager.shared.post(endpoint: "/users/login", body: loginReq)
+            
+            NetworkManager.shared.currentUserId = loginRes.token
+            
             isLoading = false
             return true
         } catch {

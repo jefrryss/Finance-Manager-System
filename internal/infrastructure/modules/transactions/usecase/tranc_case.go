@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +23,8 @@ type TransactionRepository interface {
 	ShowTransactions(ctx context.Context, userID uuid.UUID, transactionIds []uuid.UUID) error
 	HideTransactions(ctx context.Context, userID uuid.UUID, transactionIds []uuid.UUID) error
 	GetTransactionsByIDs(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID) ([]domain.Transaction, error)
+	ResolveAutoCategoryID(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string) (*uuid.UUID, error)
+	UpsertAutoCategoryRule(ctx context.Context, userID uuid.UUID, isIncome bool, mccCode *string, description string, categoryID uuid.UUID) error
 }
 
 type AccountBalanceUpdater interface {
@@ -135,12 +139,80 @@ func (uc *TransactionUseCase) UpdateTransaction(ctx context.Context, userID, tra
 		if err := uc.transRepo.UpdateTransaction(ctx, oldTrans); err != nil {
 			return fmt.Errorf("failed to update transaction in db: %w", err)
 		}
+		if oldTrans.IsImported && categoryID != nil {
+			if upsertErr := uc.transRepo.UpsertAutoCategoryRule(ctx, userID, oldTrans.IsIncome, oldTrans.MCCCode, oldTrans.NameTransaction, *categoryID); upsertErr != nil {
+				return fmt.Errorf("failed to save auto-category rule: %w", upsertErr)
+			}
+		}
 
 		if balanceDelta != 0 {
 			if err := uc.accountRepo.UpdateBalance(ctx, userID, oldTrans.AccountID, balanceDelta); err != nil {
 				return fmt.Errorf("failed to update account balance during update: %w", err)
 			}
 		}
+		return nil
+	})
+}
+
+func (uc *TransactionUseCase) UpdateImportedTransactionMeta(
+	ctx context.Context,
+	userID uuid.UUID,
+	transID uuid.UUID,
+	categoryID *uuid.UUID,
+	comment *string,
+	isHidden *bool,
+) error {
+	return uc.txManager.RunInTransaction(ctx, func(txCtx context.Context) error {
+		trans, err := uc.transRepo.GetTransaction(txCtx, userID, transID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch transaction: %w", err)
+		}
+		if !trans.IsImported {
+			return domain.ErrCannotModifyImported
+		}
+
+		if categoryID != nil {
+			trans.CategoryID = categoryID
+			if upsertErr := uc.transRepo.UpsertAutoCategoryRule(txCtx, userID, trans.IsIncome, trans.MCCCode, trans.NameTransaction, *categoryID); upsertErr != nil {
+				return fmt.Errorf("failed to save auto-category rule: %w", upsertErr)
+			}
+		}
+		if comment != nil {
+			cleaned := strings.TrimSpace(*comment)
+			if cleaned == "" {
+				trans.Comment = nil
+			} else {
+				trans.Comment = &cleaned
+			}
+		}
+
+		if isHidden != nil && trans.IsHidden != *isHidden {
+			var delta int64
+			if *isHidden {
+				if trans.IsIncome {
+					delta = -trans.Amount
+				} else {
+					delta = trans.Amount
+				}
+			} else {
+				if trans.IsIncome {
+					delta = trans.Amount
+				} else {
+					delta = -trans.Amount
+				}
+			}
+			if delta != 0 {
+				if err := uc.accountRepo.UpdateBalance(txCtx, userID, trans.AccountID, delta); err != nil {
+					return fmt.Errorf("failed to update account balance: %w", err)
+				}
+			}
+			trans.IsHidden = *isHidden
+		}
+
+		if err := uc.transRepo.UpdateTransaction(txCtx, trans); err != nil {
+			return fmt.Errorf("failed to update imported transaction: %w", err)
+		}
+
 		return nil
 	})
 }
@@ -182,7 +254,19 @@ func (uc *TransactionUseCase) GetUserTransactions(ctx context.Context, userID uu
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch transactions: %w", err)
 	}
+	sortTransactionsDesc(transactions)
 	return transactions, nil
+}
+
+func sortTransactionsDesc(transactions []domain.Transaction) {
+	sort.SliceStable(transactions, func(i, j int) bool {
+		left := transactions[i]
+		right := transactions[j]
+		if !left.CompletedAt.Equal(right.CompletedAt) {
+			return left.CompletedAt.After(right.CompletedAt)
+		}
+		return left.TransactionID.String() > right.TransactionID.String()
+	})
 }
 
 func (uc *TransactionUseCase) ToggleTransactionsVisibility(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID, hide bool) error {
