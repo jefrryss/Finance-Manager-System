@@ -1,13 +1,11 @@
 import Foundation
 import Observation
 
-// Структура запроса (соответствует LoginReq в Go)
 struct LoginRequest: Codable {
     let identifier: String
     let password: String
 }
 
-// Структура ответа от ручки /api/v1/users/login
 struct LoginResponse: Codable {
     let status: String
     let token: String
@@ -32,10 +30,8 @@ class LoginViewModel {
         let requestBody = LoginRequest(identifier: identifier, password: password)
         
         do {
-            // Стучимся в новую ручку авторизации
             let res: LoginResponse = try await NetworkManager.shared.post(endpoint: "/users/login", body: requestBody)
             
-            // Сохраняем полученный токен в постоянную память (UserDefaults)
             NetworkManager.shared.currentUserId = res.token
             
             isLoading = false

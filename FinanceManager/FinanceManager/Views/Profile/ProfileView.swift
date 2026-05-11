@@ -91,7 +91,6 @@ struct ProfileView: View {
     }
 }
 
-// Вспомогательный компонент для строк меню
 struct ProfileRow: View {
     let icon: String
     let title: String

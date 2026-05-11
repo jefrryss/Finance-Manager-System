@@ -13,19 +13,14 @@ class NetworkManager {
     private lazy var decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSSZ"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        
-        decoder.dateDecodingStrategy = .formatted(formatter)
+        decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()
     
     private lazy var encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
         return encoder
     }()
     
@@ -45,11 +40,27 @@ class NetworkManager {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
         
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8) ?? "<non-text response>"
+            throw NetworkError.badResponse(statusCode: httpResponse.statusCode, body: bodyString)
+        }
+        
         return try decoder.decode(T.self, from: data)
+    }
+    
+    enum NetworkError: LocalizedError {
+        case badResponse(statusCode: Int, body: String)
+        
+        var errorDescription: String? {
+            switch self {
+            case let .badResponse(statusCode, body):
+                return "HTTP \(statusCode): \(body)"
+            }
+        }
     }
     
     func post<T: Codable, U: Codable>(endpoint: String, body: T) async throws -> U {
@@ -67,8 +78,13 @@ class NetworkManager {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8) ?? "<non-text response>"
+            throw NetworkError.badResponse(statusCode: httpResponse.statusCode, body: bodyString)
         }
         
         return try decoder.decode(U.self, from: data)
@@ -86,8 +102,13 @@ class NetworkManager {
         
         let (_, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = ""
+            throw NetworkError.badResponse(statusCode: httpResponse.statusCode, body: bodyString)
         }
     }
     
@@ -121,8 +142,13 @@ class NetworkManager {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8) ?? "<non-text response>"
+            throw NetworkError.badResponse(statusCode: httpResponse.statusCode, body: bodyString)
         }
         
         return try decoder.decode(T.self, from: data)

@@ -36,7 +36,6 @@ struct MainContainerView: View {
             }
             .tag(2)
             
-            // ВОТ ТУТ МЫ ПОДКЛЮЧАЕМ НАСТОЯЩИЙ ПРОФИЛЬ
             ProfileView()
                 .tabItem {
                     Label("Профиль", systemImage: "person.fill")

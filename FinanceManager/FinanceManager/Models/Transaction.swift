@@ -1,27 +1,34 @@
 import Foundation
 
 struct Transaction: Codable, Identifiable {
-    let transactionId: UUID
-    let userId: UUID
-    let accountId: UUID
-    let categoryId: UUID?
+    var id: String { transactionId }
+    let transactionId: String
+    let accountId: String
+    let categoryId: String?
     let nameTransaction: String
-    let isIncome: Bool
     let amount: Int64
+    let isIncome: Bool
     let completedAt: Date
-    let isHidden: Bool
-    let isImported: Bool
     let comment: String?
+    let currency: String
+    let bankFee: Int64?
+    let isImported: Bool?
+    let externalTransactionId: String?
+    let isHidden: Bool?
     
-    var id: UUID { transactionId }
+    var name: String { nameTransaction }
+    
 }
 
-struct CreateTransReq: Codable {
-    let accountId: UUID
-    let amount: Int64
-    let categoryId: UUID
-    let comment: String
-    let completedAt: Date
-    let isIncome: Bool
+struct NewTransactionRequest: Codable {
+    let accountId: String
+    let categoryId: String
     let name: String
-}
+    let isIncome: Bool
+    let amount: Int64
+    let completedAt: Date
+    let comment: String?
+    let currency: String
+    let bankFee: Int64
+    let status: String
+} 

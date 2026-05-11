@@ -11,7 +11,7 @@ struct TransactionsPreviewList: View {
                 .padding()
         } else {
             VStack(spacing: 12) {
-                ForEach(transactions.prefix(3)) { item in // Берем только 3 последние
+                ForEach(Array(transactions.prefix(3))) { item in
                     HStack(spacing: 16) {
                         ZStack {
                             Circle()
@@ -22,7 +22,7 @@ struct TransactionsPreviewList: View {
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item.nameTransaction)
+                            Text(item.name)
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(AppTheme.textPrimary)
                             Text(item.completedAt.formatted(date: .omitted, time: .shortened))

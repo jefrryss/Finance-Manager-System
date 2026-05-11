@@ -1,27 +1,6 @@
 import Foundation
 import Observation
 
-struct CreateAccountRequest: Codable {
-    let name: String
-    let initialBalance: Int64
-    let currency: String
-    let colorHex: String
-    let accountType: String
-    let isImported: Bool
-}
-
-struct CreateAccountResponse: Codable {
-    let status: String
-    let message: String?
-}
-
-struct ImportAccountResponse: Codable {
-    let status: String
-    let accountId: String
-    let importedTransactions: Int
-    let balance: Int64
-}
-
 @Observable
 class AddAccountViewModel {
     var name = ""

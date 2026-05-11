@@ -6,7 +6,6 @@ class AccountViewModel {
     var accounts: [Account] = []
     var isLoading = false
     
-    // Вычисляем общий баланс в рублях
     var totalBalance: Double {
         let totalKopecks = accounts.reduce(0) { sum, account in
             sum + account.balance
@@ -27,7 +26,7 @@ class AccountViewModel {
     
     func deleteAccount(_ account: Account) async -> Bool {
         do {
-            try await NetworkManager.shared.delete(endpoint: "/accounts/\(account.accountId.uuidString.lowercased())")
+            try await NetworkManager.shared.delete(endpoint: "/accounts/\(account.accountId)")
             
             await fetchAccounts()
             return true

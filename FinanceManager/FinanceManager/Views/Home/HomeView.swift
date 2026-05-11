@@ -14,7 +14,6 @@ struct HomeView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 32) {
                         
-                        // 1. Блок капитала
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Ваш капитал")
                                 .font(.system(size: 16, weight: .medium))
@@ -27,7 +26,6 @@ struct HomeView: View {
                         .padding(.horizontal, 24)
                         .padding(.top, 20)
                         
-                        // 2. Быстрые действия
                         HStack(spacing: 20) {
                             QuickActionButton(title: "Трата", icon: "minus.circle.fill", color: .red) {
                                 showingAddTransaction = true
@@ -36,12 +34,10 @@ struct HomeView: View {
                                 showingAddTransaction = true
                             }
                             QuickActionButton(title: "Лимиты", icon: "gauge.with.needle.fill", color: .blue) {
-                                // Задел на будущее
                             }
                         }
                         .padding(.horizontal, 24)
                         
-                        // 3. Блок счетов
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Мои счета")
@@ -79,7 +75,6 @@ struct HomeView: View {
                             }
                         }
                         
-                        // 4. История транзакций
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("История")
@@ -92,7 +87,13 @@ struct HomeView: View {
                             }
                             .padding(.horizontal, 24)
                             
+                            if txViewModel.isLoading && txViewModel.transactions.isEmpty {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 20)
+                        } else {
                             TransactionsPreviewList(transactions: txViewModel.transactions)
+                        }
                         }
                         
                         Spacer(minLength: 100)
@@ -100,7 +101,6 @@ struct HomeView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            // ВСЕ ШТОРКИ И ЗАГРУЗКИ ДОЛЖНЫ БЫТЬ ЗДЕСЬ, В САМОМ НИЗУ ZSTACK:
             .sheet(isPresented: $showingAddAccount) {
                 AddAccountView(onSave: {
                     Task {
