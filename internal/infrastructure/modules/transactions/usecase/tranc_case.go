@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -253,7 +254,19 @@ func (uc *TransactionUseCase) GetUserTransactions(ctx context.Context, userID uu
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch transactions: %w", err)
 	}
+	sortTransactionsDesc(transactions)
 	return transactions, nil
+}
+
+func sortTransactionsDesc(transactions []domain.Transaction) {
+	sort.SliceStable(transactions, func(i, j int) bool {
+		left := transactions[i]
+		right := transactions[j]
+		if !left.CompletedAt.Equal(right.CompletedAt) {
+			return left.CompletedAt.After(right.CompletedAt)
+		}
+		return left.TransactionID.String() > right.TransactionID.String()
+	})
 }
 
 func (uc *TransactionUseCase) ToggleTransactionsVisibility(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID, hide bool) error {

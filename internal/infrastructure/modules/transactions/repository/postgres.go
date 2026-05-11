@@ -208,7 +208,7 @@ func (tr *TransRepository) GetAllTransactions(ctx context.Context, userID uuid.U
 	query := `
         SELECT * FROM Transactions 
         WHERE user_id = $1 
-        ORDER BY completed_at DESC
+        ORDER BY completed_at DESC, transaction_id DESC
     `
 
 	err := q.SelectContext(ctx, &transactions, query, userID)
@@ -271,7 +271,7 @@ func (tr *TransRepository) GetTransactionsWithFilter(ctx context.Context, userID
 		query += ` AND account_id IN (` + strings.Join(placeholders, ", ") + `)`
 	}
 
-	query += ` ORDER BY completed_at DESC`
+	query += ` ORDER BY completed_at DESC, transaction_id DESC`
 
 	err := q.SelectContext(ctx, &transactions, query, args...)
 	if err != nil {

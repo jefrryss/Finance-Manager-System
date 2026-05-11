@@ -12,6 +12,7 @@ import (
 
 type fakeTransRepo struct {
 	byID             map[uuid.UUID]*transactionDomain.Transaction
+	filtered         []transactionDomain.Transaction
 	upsertRulesCount int
 }
 
@@ -44,7 +45,7 @@ func (f *fakeTransRepo) GetAllTransactions(ctx context.Context, userID uuid.UUID
 	return nil, nil
 }
 func (f *fakeTransRepo) GetTransactionsWithFilter(ctx context.Context, userID uuid.UUID, filter transactionDomain.TransactionFilter) ([]transactionDomain.Transaction, error) {
-	return nil, nil
+	return f.filtered, nil
 }
 func (f *fakeTransRepo) ShowTransactions(ctx context.Context, userID uuid.UUID, transactionIds []uuid.UUID) error {
 	return nil
@@ -153,3 +154,39 @@ func TestUpdateTransactionRejectsImportedCoreFields(t *testing.T) {
 	}
 }
 
+func TestGetUserTransactionsSortsByCompletedAtDesc(t *testing.T) {
+	userID := uuid.New()
+	firstID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	secondID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	thirdID := uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	repo := &fakeTransRepo{
+		filtered: []transactionDomain.Transaction{
+			{
+				TransactionID: thirdID,
+				UserID:        userID,
+				CompletedAt:   time.Date(2025, 9, 28, 10, 0, 0, 0, time.UTC),
+			},
+			{
+				TransactionID: firstID,
+				UserID:        userID,
+				CompletedAt:   time.Date(2026, 5, 11, 12, 0, 0, 0, time.UTC),
+			},
+			{
+				TransactionID: secondID,
+				UserID:        userID,
+				CompletedAt:   time.Date(2026, 5, 11, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+	uc := NewTransactionUseCase(repo, &fakeBalanceUpdater{}, &fakeTransTxManager{})
+	got, err := uc.GetUserTransactions(context.Background(), userID, transactionDomain.TransactionFilter{})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 transactions, got %d", len(got))
+	}
+	if got[0].TransactionID != secondID || got[1].TransactionID != firstID || got[2].TransactionID != thirdID {
+		t.Fatalf("unexpected order: %s, %s, %s", got[0].TransactionID, got[1].TransactionID, got[2].TransactionID)
+	}
+}
